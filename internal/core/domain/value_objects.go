@@ -8,7 +8,7 @@ import (
 
 var versionRegex = regexp.MustCompile(`^$|^[~^><]=?\d[\w.*-]*$|^\d[\w.*-]*$|^[a-zA-Z][a-zA-Z0-9._-]*$`)
 
-// PackageName represents a validated npm package identifier.
+// PackageName represents a non-empty npm package identifier (trimmed).
 // Value Object: immutable, equality by value.
 type PackageName struct {
 	value string
