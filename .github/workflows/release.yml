@@ -89,6 +89,7 @@ jobs:
             --appBuild ${{ steps.ver.outputs.build_int }}
           mkdir -p dist
           APP=$(find . -maxdepth 1 -name "*.app" | head -1)
+          codesign --force --deep --sign "-" "$APP"
           hdiutil create \
             -volname "Packages NPM" \
             -srcfolder "$APP" \
