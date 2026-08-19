@@ -163,7 +163,7 @@ func (m *MainWindow) onInstall() {
 		return
 	}
 
-	progressDlg := components.NewProgressDialog("Instalando Pacotes", "instalação", m.window)
+	progressDlg := components.NewProgressDialog("Instalando Pacotes", "Instalando", m.window)
 	var failures []string
 
 	go func() {
