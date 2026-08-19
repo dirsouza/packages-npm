@@ -82,6 +82,7 @@ jobs:
         run: |
           fyne package \
             --src ./cmd/app \
+            --icon ./Icon.png \
             --appVersion ${{ steps.ver.outputs.version }} \
             --appBuild ${{ steps.ver.outputs.build_int }}
           mkdir -p dist
@@ -99,6 +100,7 @@ jobs:
         run: |
           fyne package \
             --src ./cmd/app \
+            --icon ./Icon.png \
             --appVersion ${{ steps.ver.outputs.version }} \
             --appBuild ${{ steps.ver.outputs.build_int }}
           mkdir -p dist
@@ -114,6 +116,7 @@ jobs:
           $env:CC = "gcc"
           fyne package `
             --src ./cmd/app `
+            --icon ./Icon.png `
             --appVersion ${{ steps.ver.outputs.version }} `
             --appBuild ${{ steps.ver.outputs.build_int }}
           New-Item -ItemType Directory -Force -Path dist | Out-Null
