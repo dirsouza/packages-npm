@@ -1,0 +1,8 @@
+Website = "https://github.com/dirsouza/packages-npm"
+
+[Details]
+Icon    = "Icon.png"
+Name    = "Packages NPM"
+ID      = "com.dirsouza.packages-npm"
+Version = "1.0.0"
+Build   = "00001"
