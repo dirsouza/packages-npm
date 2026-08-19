@@ -1,98 +1,96 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/golangci/golangci-lint/v1.64.8/jsonschema/golangci.jsonschema.json
-# golangci-lint v1.64.8
-
+version: "2"
 run:
-  timeout: 5m
   modules-download-mode: readonly
-
 linters:
-  disable-all: true
+  default: none
   enable:
-    # Correctness
+    - bodyclose
+    - copyloopvar
+    - cyclop
     - errcheck
+    - gocognit
+    - gocritic
+    - godot
+    - gosec
     - govet
+    - ineffassign
+    - revive
+    - rowserrcheck
     - staticcheck
     - unused
-    - ineffassign
-
-    # Style / Clean Code
-    - gofmt
-    - goimports
-    - revive
-    - gocritic
-
-    # Bugs
-    - bodyclose
-    - rowserrcheck
-    - copyloopvar
-
-    # Complexity
-    - gocognit
-    - cyclop
-
-    # Security
-    - gosec
-
-    # Go idioms
-    - godot
-
-linters-settings:
-  gocognit:
-    min-complexity: 20
-
-  cyclop:
-    max-complexity: 15
-
-  revive:
+  settings:
+    cyclop:
+      max-complexity: 15
+    gocognit:
+      min-complexity: 20
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+    gosec:
+      excludes:
+        - G304
+    revive:
+      rules:
+        - name: exported
+          severity: warning
+        - name: unexported-return
+          severity: warning
+        - name: error-return
+          severity: warning
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      - name: exported
-        severity: warning
-      - name: unexported-return
-        severity: warning
-      - name: error-return
-        severity: warning
-
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-
-  gosec:
-    excludes:
-      - G304 # file path from variable — necessário para backup (os.Open/Create com path do usuário)
-
+      - linters:
+          - cyclop
+          - gocognit
+        path: cmd/app/
+      - linters:
+          - gocognit
+        path: internal/adapters/persistence/
+      - linters:
+          - gosec
+        path: internal/adapters/persistence/
+        text: 'G201:'
+      - linters:
+          - cyclop
+          - gocognit
+        path: ui/window/main_window.go
+      - linters:
+          - cyclop
+        path: ui/uitheme/
+      - linters:
+          - gocritic
+        path: ui/viewmodel/
+        text: (hugeParam|rangeValCopy)
+      - linters:
+          - gocritic
+        path: ui/components/
+        text: (hugeParam|rangeValCopy)
+      - linters:
+          - gocritic
+        path: ui/window/
+        text: (hugeParam|rangeValCopy)
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  exclude-rules:
-    # Seed e main podem ter funções mais longas
-    - path: cmd/app/
-      linters: [gocognit, cyclop]
-
-    # Adaptadores SQLite têm queries longas — normal
-    - path: internal/adapters/persistence/
-      linters: [gocognit]
-    - path: internal/adapters/persistence/
-      linters: [gosec]
-      text: "G201:"
-
-    # Presenter da UI é naturalmente mais complexo
-    - path: ui/window/main_window.go
-      linters: [gocognit, cyclop]
-
-    # Tema visual usa switch extenso por design
-    - path: ui/uitheme/
-      linters: [cyclop]
-
-    # PackageVM é valor por design nesta UI
-    - path: ui/viewmodel/
-      linters: [gocritic]
-      text: "(hugeParam|rangeValCopy)"
-    - path: ui/components/
-      linters: [gocritic]
-      text: "(hugeParam|rangeValCopy)"
-    - path: ui/window/
-      linters: [gocritic]
-      text: "(hugeParam|rangeValCopy)"
-
   max-same-issues: 5
   fix: false
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
