@@ -291,16 +291,22 @@ func (m *MainWindow) onImport() {
 				if replace {
 					mode = domain.ImportReplace
 				}
-				imported, importErr := m.useCase.ImportBackup(path, mode)
-				if importErr != nil {
-					components.ShowError(importErr, m.window)
-					return
-				}
-				components.ShowInfo("Backup importado",
-					fmt.Sprintf("%d pacote(s) importado(s) com sucesso.", imported), m.window)
-				m.setStatus(fmt.Sprintf("📦  %d pacote(s) importado(s).", imported))
-				m.reload()
-				go m.refreshInstallStatus()
+				m.setStatus("⏳  Importando backup...")
+				go func() {
+					imported, importErr := m.useCase.ImportBackup(path, mode)
+					fyne.Do(func() {
+						if importErr != nil {
+							components.ShowError(importErr, m.window)
+							m.setStatus("⚠️  Falha ao importar backup.")
+							return
+						}
+						components.ShowInfo("Backup importado",
+							fmt.Sprintf("%d pacote(s) importado(s) com sucesso.", imported), m.window)
+						m.setStatus(fmt.Sprintf("📦  %d pacote(s) importado(s).", imported))
+						m.reload()
+						go m.refreshInstallStatus()
+					})
+				}()
 			},
 			m.window,
 		)
