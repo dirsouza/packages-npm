@@ -81,7 +81,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           fyne package \
-            --sourceDir ./cmd/app \
+            --src ./cmd/app \
             --appVersion ${{ steps.ver.outputs.version }} \
             --appBuild ${{ steps.ver.outputs.build_int }}
           mkdir -p dist
@@ -98,7 +98,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           fyne package \
-            --sourceDir ./cmd/app \
+            --src ./cmd/app \
             --appVersion ${{ steps.ver.outputs.version }} \
             --appBuild ${{ steps.ver.outputs.build_int }}
           mkdir -p dist
@@ -113,7 +113,7 @@ jobs:
           $env:CGO_ENABLED = "1"
           $env:CC = "gcc"
           fyne package `
-            --sourceDir ./cmd/app `
+            --src ./cmd/app `
             --appVersion ${{ steps.ver.outputs.version }} `
             --appBuild ${{ steps.ver.outputs.build_int }}
           New-Item -ItemType Directory -Force -Path dist | Out-Null
