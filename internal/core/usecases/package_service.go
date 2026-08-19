@@ -68,9 +68,16 @@ func (s *PackageService) InstallSelected(ids []int64, onProgress outbound.Progre
 		return domain.ErrNoPackageSelected
 	}
 
+	if onProgress == nil {
+		onProgress = func(string, int, int, error) {}
+	}
+
 	packages, err := s.repo.FindByIDs(ids)
 	if err != nil {
 		return err
+	}
+	if len(packages) == 0 {
+		return domain.ErrPackageNotFound
 	}
 
 	total := len(packages)
