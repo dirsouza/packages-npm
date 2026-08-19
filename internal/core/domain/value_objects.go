@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-var versionRegex = regexp.MustCompile(`^$|^[~^><]=?\d[\w.*-]*$|^\d[\w.*-]*$|^[a-zA-Z][a-zA-Z0-9._-]*$`)
+var versionRegex = regexp.MustCompile(`^$|^\*$|^[~^><]=?\d[\w.*-]*$|^\d[\w.*-]*$|^[a-zA-Z][a-zA-Z0-9._-]*$`)
 
 // PackageName represents a non-empty npm package identifier (trimmed).
 // Value Object: immutable, equality by value.
