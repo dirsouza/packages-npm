@@ -1,0 +1,189 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: packages-npm-linux-amd64.tar.gz
+          - os: macos-latest
+            artifact: packages-npm-darwin-amd64.dmg
+          - os: windows-latest
+            artifact: packages-npm-windows-amd64.exe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # ── Linux dependencies ────────────────────────────────────────────────
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            libgl1-mesa-dev xorg-dev \
+            libwayland-dev libxkbcommon-dev
+
+      # ── Windows: GCC via MSYS2 ────────────────────────────────────────────
+      - name: Install system dependencies (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          install: mingw-w64-x86_64-gcc
+
+      # ── Read version from FyneApp.toml ───────────────────────────────────
+      - name: Read version info
+        id: ver
+        shell: bash
+        run: |
+          echo "version=$(grep -E '^Version\s*=' FyneApp.toml | sed 's/.*\"\(.*\)\".*/\1/')" >> "$GITHUB_OUTPUT"
+          BUILD=$(grep -E '^Build\s*=' FyneApp.toml | sed 's/.*"\(.*\)".*/\1/')
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "build_int=$((10#$BUILD))" >> "$GITHUB_OUTPUT"
+
+      # ── Install fyne CLI ──────────────────────────────────────────────────
+      - name: Install fyne CLI (Linux / macOS)
+        if: runner.os != 'Windows'
+        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+
+      - name: Install fyne CLI (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          go install fyne.io/fyne/v2/cmd/fyne@latest
+
+      # ── macOS: .app bundle → .dmg ─────────────────────────────────────────
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          go build \
+            -ldflags "-s -w -X main.Version=${{ steps.ver.outputs.version }} -X main.Build=${{ steps.ver.outputs.build }}" \
+            -o bin/app-bin ./cmd/app
+          fyne package \
+            --executable bin/app-bin \
+            --app-version ${{ steps.ver.outputs.version }} \
+            --app-build ${{ steps.ver.outputs.build_int }}
+          mkdir -p dist
+          APP=$(find . -maxdepth 1 -name "*.app" | head -1)
+          hdiutil create \
+            -volname "Packages NPM" \
+            -srcfolder "$APP" \
+            -ov -format UDZO \
+            "dist/packages-npm-darwin-amd64.dmg"
+
+      # ── Linux: .tar.gz com .desktop entry ────────────────────────────────
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          go build \
+            -ldflags "-s -w -X main.Version=${{ steps.ver.outputs.version }} -X main.Build=${{ steps.ver.outputs.build }}" \
+            -o bin/app-bin ./cmd/app
+          fyne package \
+            --executable bin/app-bin \
+            --app-version ${{ steps.ver.outputs.version }} \
+            --app-build ${{ steps.ver.outputs.build_int }}
+          mkdir -p dist
+          find . -maxdepth 1 -name "*.tar.gz" -exec mv {} dist/packages-npm-linux-amd64.tar.gz \;
+
+      # ── Windows: .exe com ícone embutido ─────────────────────────────────
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          go build \
+            -ldflags "-s -w -H windowsgui -X main.Version=${{ steps.ver.outputs.version }} -X main.Build=${{ steps.ver.outputs.build }}" \
+            -o bin/app-bin.exe ./cmd/app
+          fyne package \
+            --executable bin/app-bin.exe \
+            --app-version ${{ steps.ver.outputs.version }} \
+            --app-build ${{ steps.ver.outputs.build_int }}
+          mkdir -p dist
+          find . -maxdepth 1 -name "*.exe" ! -name "app-bin.exe" -exec mv {} dist/packages-npm-windows-amd64.exe \;
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}
+
+  release:
+    name: Create GitHub Release
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Read version
+        id: ver
+        run: echo "version=$(grep -E '^Version\s*=' FyneApp.toml | sed 's/.*\"\(.*\)\".*/\1/')" >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "packages-npm ${{ github.ref_name }}"
+          body: |
+            ## packages-npm ${{ github.ref_name }}
+
+            ### Downloads
+
+            | Plataforma | Arquivo | Tipo |
+            |---|---|---|
+            | 🍎 macOS | `packages-npm-darwin-amd64.dmg` | Disk Image (arraste para /Applications) |
+            | 🐧 Linux | `packages-npm-linux-amd64.tar.gz` | Tarball + .desktop entry |
+            | 🪟 Windows | `packages-npm-windows-amd64.exe` | Executável com ícone embutido |
+
+            ### Instalação
+
+            **macOS**
+            1. Abra `packages-npm-darwin-amd64.dmg`
+            2. Arraste `Packages NPM.app` para `/Applications`
+            3. Na primeira execução: botão direito → **Abrir**
+
+            **Linux**
+            ```bash
+            tar -xzf packages-npm-linux-amd64.tar.gz
+            chmod +x packages-npm
+            ./packages-npm
+            # Opcional: copie o .desktop para ~/.local/share/applications/
+            ```
+
+            **Windows**
+            Execute `packages-npm-windows-amd64.exe` diretamente — sem instalação necessária.
+
+            ---
+            **Requisito:** [Node.js / npm](https://nodejs.org/) instalado no sistema.
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            dist/packages-npm-linux-amd64.tar.gz
+            dist/packages-npm-darwin-amd64.dmg
+            dist/packages-npm-windows-amd64.exe

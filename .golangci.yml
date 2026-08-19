@@ -1,0 +1,96 @@
+version: "2"
+run:
+  modules-download-mode: readonly
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - copyloopvar
+    - cyclop
+    - errcheck
+    - gocognit
+    - gocritic
+    - godot
+    - gosec
+    - govet
+    - ineffassign
+    - revive
+    - rowserrcheck
+    - staticcheck
+    - unused
+  settings:
+    cyclop:
+      max-complexity: 15
+    gocognit:
+      min-complexity: 20
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+    gosec:
+      excludes:
+        - G304
+    revive:
+      rules:
+        - name: exported
+          severity: warning
+        - name: unexported-return
+          severity: warning
+        - name: error-return
+          severity: warning
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - cyclop
+          - gocognit
+        path: cmd/app/
+      - linters:
+          - gocognit
+        path: internal/adapters/persistence/
+      - linters:
+          - gosec
+        path: internal/adapters/persistence/
+        text: 'G201:'
+      - linters:
+          - cyclop
+          - gocognit
+        path: ui/window/main_window.go
+      - linters:
+          - cyclop
+        path: ui/uitheme/
+      - linters:
+          - gocritic
+        path: ui/viewmodel/
+        text: (hugeParam|rangeValCopy)
+      - linters:
+          - gocritic
+        path: ui/components/
+        text: (hugeParam|rangeValCopy)
+      - linters:
+          - gocritic
+        path: ui/window/
+        text: (hugeParam|rangeValCopy)
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-same-issues: 5
+  fix: false
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
