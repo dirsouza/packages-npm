@@ -4,7 +4,7 @@ BIN     := bin/packages-npm
 MAIN    := ./cmd/app
 VERSION   := $(shell grep -E '^Version\s*=' FyneApp.toml | sed 's/.*"\(.*\)".*/\1/')
 BUILD     := $(shell grep -E '^Build\s*=' FyneApp.toml | sed 's/.*"\(.*\)".*/\1/')
-BUILD_INT := $(shell printf '%d' $(BUILD))
+BUILD_INT := $(shell echo $(BUILD) | sed 's/^0*//;s/^$$/0/')
 LDFLAGS   := -X main.Version=$(VERSION) -X main.Build=$(BUILD)
 
 fmt:
