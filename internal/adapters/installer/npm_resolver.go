@@ -23,7 +23,11 @@ type npmLocation struct {
 // desktop environments. This function tries common install locations per OS.
 func resolveNpm() (npmLocation, error) {
 	found := func(p string) (npmLocation, error) {
-		return npmLocation{path: p, binDir: filepath.Dir(p)}, nil
+		resolvedPath, err := absolutePath(p)
+		if err != nil {
+			return npmLocation{}, err
+		}
+		return npmLocation{path: resolvedPath, binDir: filepath.Dir(resolvedPath)}, nil
 	}
 
 	// 1. Process PATH — works in terminal launches and most Linux setups.
@@ -62,7 +66,7 @@ func resolveNpmUnix(found func(string) (npmLocation, error)) (npmLocation, error
 	}
 
 	// fnm — newest version installed
-	if p, err := globLast(filepath.Join(home, ".local/share/fnm/node-versions/*/installation/bin/npm")); err == nil {
+	if p, err := globLast(filepath.Join(home, ".local", "share", "fnm", "node-versions", "*", "installation", "bin", "npm")); err == nil {
 		return found(p)
 	}
 
@@ -80,7 +84,7 @@ func resolveNpmUnix(found func(string) (npmLocation, error)) (npmLocation, error
 	}
 
 	// nvm — fallback: lexicographically last (newest) installed version
-	if p, err := globLast(filepath.Join(home, ".nvm/versions/node/*/bin/npm")); err == nil {
+	if p, err := globLast(filepath.Join(home, ".nvm", "versions", "node", "*", "bin", "npm")); err == nil {
 		return found(p)
 	}
 
@@ -115,17 +119,17 @@ func resolveNpmWindows(found func(string) (npmLocation, error)) (npmLocation, er
 	}
 
 	// nvm-windows (~\AppData\Roaming\nvm\<version>\npm.cmd)
-	if p, err := globLast(filepath.Join(appData, `nvm\v*\npm.cmd`)); err == nil {
+	if p, err := globLast(filepath.Join(appData, "nvm", "v*", "npm.cmd")); err == nil {
 		return found(p)
 	}
 
 	// fnm on Windows (~\AppData\Local\fnm\node-versions\*\installation\npm.cmd)
-	if p, err := globLast(filepath.Join(localAppData, `fnm\node-versions\*\installation\npm.cmd`)); err == nil {
+	if p, err := globLast(filepath.Join(localAppData, "fnm", "node-versions", "*", "installation", "npm.cmd")); err == nil {
 		return found(p)
 	}
 
 	// Scoop (~\scoop\apps\nodejs\current\npm.cmd)
-	if p := filepath.Join(home, `scoop\apps\nodejs\current\npm.cmd`); isExecutable(p) {
+	if p := filepath.Join(home, "scoop", "apps", "nodejs", "current", "npm.cmd"); isExecutable(p) {
 		return found(p)
 	}
 
@@ -145,7 +149,10 @@ func newNpmCmd(args ...string) (*exec.Cmd, error) {
 		return nil, err
 	}
 
-	cmd := exec.Command(loc.path, args...)
+	cmd := &exec.Cmd{
+		Path: loc.path,
+		Args: append([]string{loc.path}, args...),
+	}
 
 	// Prepend the node bin dir so npm can invoke `node` even in GUI contexts.
 	// Use the OS-specific path list separator (: on Unix, ; on Windows).
@@ -165,13 +172,27 @@ func newNpmCmd(args ...string) (*exec.Cmd, error) {
 	return cmd, nil
 }
 
+func absolutePath(path string) (string, error) {
+	cleaned := filepath.Clean(path)
+	if filepath.IsAbs(cleaned) {
+		return cleaned, nil
+	}
+	return filepath.Abs(cleaned)
+}
+
 func isExecutable(path string) bool {
-	info, err := os.Stat(path)
+	cleaned, err := absolutePath(path)
+	if err != nil {
+		return false
+	}
+
+	// #nosec G703 -- candidate executables are normalized to absolute paths before inspection.
+	info, err := os.Stat(cleaned)
 	if err != nil || info.IsDir() {
 		return false
 	}
 	if runtime.GOOS == "windows" {
-		ext := strings.ToLower(filepath.Ext(path))
+		ext := strings.ToLower(filepath.Ext(cleaned))
 		return ext == ".exe" || ext == ".cmd" || ext == ".bat"
 	}
 	return info.Mode()&0o111 != 0
