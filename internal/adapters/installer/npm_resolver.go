@@ -151,7 +151,13 @@ func newNpmCmd(args ...string) (*exec.Cmd, error) {
 	// Use the OS-specific path list separator (: on Unix, ; on Windows).
 	current := os.Getenv("PATH")
 	if current == "" {
-		current = "/usr/bin:/bin"
+		if runtime.GOOS == "windows" {
+			if sysRoot := os.Getenv("SystemRoot"); sysRoot != "" {
+				current = filepath.Join(sysRoot, "System32")
+			}
+		} else {
+			current = "/usr/bin:/bin"
+		}
 	}
 	sep := string(os.PathListSeparator)
 	cmd.Env = append(os.Environ(), "PATH="+loc.binDir+sep+current)
