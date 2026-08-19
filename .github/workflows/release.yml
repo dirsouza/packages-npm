@@ -39,7 +39,8 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -y --no-install-recommends \
-            libgl1-mesa-dev xorg-dev
+            libgl1-mesa-dev xorg-dev \
+            libwayland-dev libxkbcommon-dev
 
       # ── Windows: GCC via MSYS2 ────────────────────────────────────────────
       - name: Install system dependencies (Windows)
