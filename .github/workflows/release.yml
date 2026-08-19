@@ -51,6 +51,11 @@ jobs:
           update: false
           install: mingw-w64-x86_64-gcc
 
+      - name: Add MINGW64 to PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: echo "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       # ── Read version from FyneApp.toml ───────────────────────────────────
       - name: Read version info
         id: ver
@@ -64,14 +69,12 @@ jobs:
       # ── Install fyne CLI ──────────────────────────────────────────────────
       - name: Install fyne CLI (Linux / macOS)
         if: runner.os != 'Windows'
-        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+        run: go install fyne.io/tools/cmd/fyne@latest
 
       - name: Install fyne CLI (Windows)
         if: runner.os == 'Windows'
-        shell: msys2 {0}
-        run: |
-          export PATH="$PATH:$(go env GOPATH)/bin"
-          go install fyne.io/fyne/v2/cmd/fyne@latest
+        shell: pwsh
+        run: go install fyne.io/tools/cmd/fyne@latest
 
       # ── macOS: .app bundle → .dmg ─────────────────────────────────────────
       - name: Package (macOS)
@@ -109,18 +112,20 @@ jobs:
       # ── Windows: .exe com ícone embutido ─────────────────────────────────
       - name: Package (Windows)
         if: runner.os == 'Windows'
-        shell: msys2 {0}
+        shell: pwsh
         run: |
-          export PATH="$PATH:$(go env GOPATH)/bin"
-          go build \
-            -ldflags "-s -w -H windowsgui -X main.Version=${{ steps.ver.outputs.version }} -X main.Build=${{ steps.ver.outputs.build }}" \
+          $env:PATH = "$env:PATH;$(go env GOPATH)\bin"
+          $env:CGO_ENABLED = "1"
+          $env:CC = "gcc"
+          go build `
+            -ldflags "-s -w -H windowsgui -X main.Version=${{ steps.ver.outputs.version }} -X main.Build=${{ steps.ver.outputs.build }}" `
             -o bin/app-bin.exe ./cmd/app
-          fyne package \
-            --executable bin/app-bin.exe \
-            --appVersion ${{ steps.ver.outputs.version }} \
+          fyne package `
+            --executable bin/app-bin.exe `
+            --appVersion ${{ steps.ver.outputs.version }} `
             --appBuild ${{ steps.ver.outputs.build_int }}
-          mkdir -p dist
-          find . -maxdepth 1 -name "*.exe" ! -name "app-bin.exe" -exec mv {} dist/packages-npm-windows-amd64.exe \;
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Get-ChildItem -MaxDepth 1 -Filter "*.exe" | Where-Object { $_.Name -ne "app-bin.exe" } | Move-Item -Destination dist/packages-npm-windows-amd64.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
