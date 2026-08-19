@@ -80,11 +80,8 @@ jobs:
       - name: Package (macOS)
         if: runner.os == 'macOS'
         run: |
-          go build \
-            -ldflags "-s -w -X main.Version=${{ steps.ver.outputs.version }} -X main.Build=${{ steps.ver.outputs.build }}" \
-            -o bin/app-bin ./cmd/app
           fyne package \
-            --executable bin/app-bin \
+            --sourceDir ./cmd/app \
             --appVersion ${{ steps.ver.outputs.version }} \
             --appBuild ${{ steps.ver.outputs.build_int }}
           mkdir -p dist
@@ -100,11 +97,8 @@ jobs:
       - name: Package (Linux)
         if: runner.os == 'Linux'
         run: |
-          go build \
-            -ldflags "-s -w -X main.Version=${{ steps.ver.outputs.version }} -X main.Build=${{ steps.ver.outputs.build }}" \
-            -o bin/app-bin ./cmd/app
           fyne package \
-            --executable bin/app-bin \
+            --sourceDir ./cmd/app \
             --appVersion ${{ steps.ver.outputs.version }} \
             --appBuild ${{ steps.ver.outputs.build_int }}
           mkdir -p dist
@@ -118,15 +112,12 @@ jobs:
           $env:PATH = "$env:PATH;$(go env GOPATH)\bin"
           $env:CGO_ENABLED = "1"
           $env:CC = "gcc"
-          go build `
-            -ldflags "-s -w -H windowsgui -X main.Version=${{ steps.ver.outputs.version }} -X main.Build=${{ steps.ver.outputs.build }}" `
-            -o bin/app-bin.exe ./cmd/app
           fyne package `
-            --executable bin/app-bin.exe `
+            --sourceDir ./cmd/app `
             --appVersion ${{ steps.ver.outputs.version }} `
             --appBuild ${{ steps.ver.outputs.build_int }}
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Get-ChildItem -MaxDepth 1 -Filter "*.exe" | Where-Object { $_.Name -ne "app-bin.exe" } | Move-Item -Destination dist/packages-npm-windows-amd64.exe
+          Get-ChildItem -Filter "*.exe" | Where-Object { $_.Name -ne "app-bin.exe" } | Move-Item -Destination dist/packages-npm-windows-amd64.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
