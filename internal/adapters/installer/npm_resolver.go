@@ -159,10 +159,16 @@ func newNpmCmd(args ...string) (*exec.Cmd, error) {
 	return cmd, nil
 }
 
-// isExecutable reports whether path exists and is a regular executable file.
 func isExecutable(path string) bool {
 	info, err := os.Stat(path)
-	return err == nil && !info.IsDir() && info.Mode()&0o111 != 0
+	if err != nil || info.IsDir() {
+		return false
+	}
+	if runtime.GOOS == "windows" {
+		ext := strings.ToLower(filepath.Ext(path))
+		return ext == ".exe" || ext == ".cmd" || ext == ".bat"
+	}
+	return info.Mode()&0o111 != 0
 }
 
 // globLast returns the lexicographically last match for pattern (newest
