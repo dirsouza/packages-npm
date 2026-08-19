@@ -22,8 +22,8 @@ package: clean
 	go build -ldflags "-s -w $(LDFLAGS)" -o bin/packages-npm-bin $(MAIN)
 	fyne package \
 		--executable bin/packages-npm-bin \
-		--app-version $(VERSION) \
-		--app-build $(BUILD_INT)
+		--appVersion $(VERSION) \
+		--appBuild $(BUILD_INT)
 	@rm -f bin/packages-npm-bin
 	@find . -maxdepth 1 -name "*.app"    -exec mv {} dist/ \;
 	@find . -maxdepth 1 -name "*.tar.gz" -exec mv {} dist/ \;
