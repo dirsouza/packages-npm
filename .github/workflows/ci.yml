@@ -2,9 +2,22 @@ name: CI
 
 on:
   push:
-    branches: [develop]
+    branches:
+      - develop
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   pull_request:
-    branches: [main, develop]
+    branches:
+      - develop  # recebe PRs de feat/** e fix/**
+      - main     # recebe PRs de develop e hotfix/**
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -14,19 +27,31 @@ jobs:
   validate-source-branch:
     name: Validate source branch
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    if: github.event_name == 'pull_request'
     steps:
       - name: Check allowed source branches
         run: |
           SOURCE="${{ github.head_ref }}"
-          echo "Branch de origem: $SOURCE"
-          if [[ "$SOURCE" != "develop" && "$SOURCE" != hotfix/* ]]; then
-            echo "❌ PRs para 'main' só são permitidos de 'develop' ou 'hotfix/*'."
-            echo "   Branch atual: $SOURCE"
-            echo "   Abra o PR para 'develop' em vez de 'main'."
-            exit 1
+          TARGET="${{ github.base_ref }}"
+          echo "Branch de origem: $SOURCE → destino: $TARGET"
+
+          if [[ "$TARGET" == "main" ]]; then
+            if [[ "$SOURCE" != "develop" && "$SOURCE" != hotfix/* ]]; then
+              echo "❌ PRs para 'main' só são permitidos de 'develop' ou 'hotfix/*'."
+              echo "   Branch atual: $SOURCE"
+              exit 1
+            fi
           fi
-          echo "✅ Branch de origem autorizada: $SOURCE"
+
+          if [[ "$TARGET" == "develop" ]]; then
+            if [[ "$SOURCE" != feat/* && "$SOURCE" != fix/* ]]; then
+              echo "❌ PRs para 'develop' só são permitidos de 'feat/*' ou 'fix/*'."
+              echo "   Branch atual: $SOURCE"
+              exit 1
+            fi
+          fi
+
+          echo "✅ Branch de origem autorizada: $SOURCE → $TARGET"
 
   lint:
     name: Lint
