@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Valida que PRs para main só vêm de develop ou hotfix/* ─────────────────
+  validate-source-branch:
+    name: Validate source branch
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    steps:
+      - name: Check allowed source branches
+        run: |
+          SOURCE="${{ github.head_ref }}"
+          echo "Branch de origem: $SOURCE"
+          if [[ "$SOURCE" != "develop" && "$SOURCE" != hotfix/* ]]; then
+            echo "❌ PRs para 'main' só são permitidos de 'develop' ou 'hotfix/*'."
+            echo "   Branch atual: $SOURCE"
+            echo "   Abra o PR para 'develop' em vez de 'main'."
+            exit 1
+          fi
+          echo "✅ Branch de origem autorizada: $SOURCE"
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install system dependencies (Fyne / OpenGL)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            libgl1-mesa-dev xorg-dev
+
+      - name: Check formatting (go fmt)
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "Os seguintes arquivos precisam de formatação (rode 'make fmt'):"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            binary: packages-npm-linux
+          - os: macos-latest
+            binary: packages-npm-darwin
+          - os: windows-latest
+            binary: packages-npm-windows.exe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            libgl1-mesa-dev xorg-dev
+
+      - name: Install system dependencies (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          install: mingw-w64-x86_64-gcc
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build -v -o bin/${{ matrix.binary }} ./cmd/app
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.binary }}
+          path: bin/${{ matrix.binary }}
+          retention-days: 7
