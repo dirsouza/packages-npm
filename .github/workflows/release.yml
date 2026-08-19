@@ -58,7 +58,7 @@ jobs:
           echo "version=$(grep -E '^Version\s*=' FyneApp.toml | sed 's/.*\"\(.*\)\".*/\1/')" >> "$GITHUB_OUTPUT"
           BUILD=$(grep -E '^Build\s*=' FyneApp.toml | sed 's/.*"\(.*\)".*/\1/')
           echo "build=$BUILD" >> "$GITHUB_OUTPUT"
-          echo "build_int=$(printf '%d' $BUILD)" >> "$GITHUB_OUTPUT"
+          echo "build_int=$((10#$BUILD))" >> "$GITHUB_OUTPUT"
 
       # ── Install fyne CLI ──────────────────────────────────────────────────
       - name: Install fyne CLI (Linux / macOS)
