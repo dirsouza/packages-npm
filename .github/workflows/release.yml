@@ -56,16 +56,6 @@ jobs:
         shell: pwsh
         run: echo "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      # ── Read version from FyneApp.toml ───────────────────────────────────
-      - name: Read version info
-        id: ver
-        shell: bash
-        run: |
-          echo "version=$(grep -E '^Version\s*=' FyneApp.toml | sed 's/.*\"\(.*\)\".*/\1/')" >> "$GITHUB_OUTPUT"
-          BUILD=$(grep -E '^Build\s*=' FyneApp.toml | sed 's/.*"\(.*\)".*/\1/')
-          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
-          echo "build_int=$((10#$BUILD))" >> "$GITHUB_OUTPUT"
-
       # ── Install fyne CLI ──────────────────────────────────────────────────
       - name: Install fyne CLI (Linux / macOS)
         if: runner.os != 'Windows'
@@ -76,8 +66,9 @@ jobs:
         shell: pwsh
         run: go install fyne.io/tools/cmd/fyne@latest
 
-      # fyne package --src procura FyneApp.toml no diretório do source —
-      # sem ele o bundle sai como "app.app" e sem metadados
+      # fyne package precisa do FyneApp.toml junto do source; sem ele (ou com
+      # TOML inválido — Build deve ser inteiro) o bundle sai como "app" e sem
+      # metadados (com.example.app)
       - name: Copy FyneApp.toml into source dir
         shell: bash
         run: cp FyneApp.toml cmd/app/
@@ -142,10 +133,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-
-      - name: Read version
-        id: ver
-        run: echo "version=$(grep -E '^Version\s*=' FyneApp.toml | sed 's/.*\"\(.*\)\".*/\1/')" >> "$GITHUB_OUTPUT"
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4

@@ -3,7 +3,7 @@
 BIN     := bin/packages-npm
 MAIN    := ./cmd/app
 VERSION   := $(shell grep -E '^Version\s*=' FyneApp.toml | sed 's/.*"\(.*\)".*/\1/')
-BUILD     := $(shell grep -E '^Build\s*=' FyneApp.toml | sed 's/.*"\(.*\)".*/\1/')
+BUILD     := $(shell grep -E '^Build\s*=' FyneApp.toml | sed 's/[^0-9]*//g')
 BUILD_INT := $(shell echo $(BUILD) | sed 's/^0*//;s/^$$/0/')
 LDFLAGS   := -X main.Version=$(VERSION) -X main.Build=$(BUILD)
 
@@ -19,9 +19,11 @@ build:
 package: clean
 	@echo "Empacotando com fyne package..."
 	@mkdir -p dist
+	@cp FyneApp.toml $(MAIN)/
 	fyne package --src $(MAIN)
 	@find . -maxdepth 1 -name "*.app"    -exec mv {} dist/ \;
 	@find . -maxdepth 1 -name "*.tar.gz" -exec mv {} dist/ \;
+	@find . -maxdepth 1 -name "*.tar.xz" -exec mv {} dist/ \;
 	@find . -maxdepth 1 -name "*.exe"    -exec mv {} dist/ \;
 	@echo "Artefatos em dist/"
 
