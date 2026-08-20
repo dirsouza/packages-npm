@@ -18,8 +18,6 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact: packages-npm-linux-amd64.tar.xz
-          - os: macos-latest
-            artifact: packages-npm-darwin-arm64.dmg
           - os: windows-latest
             artifact: packages-npm-windows-amd64.exe
 
@@ -57,8 +55,8 @@ jobs:
         run: echo "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       # ── Install fyne CLI ──────────────────────────────────────────────────
-      - name: Install fyne CLI (Linux / macOS)
-        if: runner.os != 'Windows'
+      - name: Install fyne CLI (Linux)
+        if: runner.os == 'Linux'
         run: go install fyne.io/tools/cmd/fyne@latest
 
       - name: Install fyne CLI (Windows)
@@ -72,20 +70,6 @@ jobs:
       - name: Copy FyneApp.toml into source dir
         shell: bash
         run: cp FyneApp.toml cmd/app/
-
-      # ── macOS: .app bundle → .dmg ─────────────────────────────────────────
-      - name: Package (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          fyne package --src ./cmd/app
-          mkdir -p dist
-          APP=$(find . -maxdepth 1 -name "*.app" | head -1)
-          codesign --force --deep --sign "-" "$APP"
-          hdiutil create \
-            -volname "Packages NPM" \
-            -srcfolder "$APP" \
-            -ov -format UDZO \
-            "dist/packages-npm-darwin-arm64.dmg"
 
       # ── Linux: .tar.xz com .desktop entry ────────────────────────────────
       - name: Package (Linux)
@@ -151,18 +135,33 @@ jobs:
 
             | Plataforma | Arquivo | Tipo |
             |---|---|---|
-            | 🍎 macOS (Apple Silicon) | `packages-npm-darwin-arm64.dmg` | Disk Image (arraste para /Applications) |
             | 🐧 Linux | `packages-npm-linux-amd64.tar.xz` | Tarball + .desktop entry |
             | 🪟 Windows | `packages-npm-windows-amd64.exe` | Executável com ícone embutido |
+            | 🍎 macOS | — | Build manual (veja instruções abaixo) |
 
             ### Instalação
 
-            **macOS**
-            1. Abra `packages-npm-darwin-arm64.dmg`
-            2. Arraste `Packages NPM.app` para `/Applications`
-            3. Na primeira abertura o macOS avisará que não pôde verificar o app (o app não é notarizado pela Apple). Clique **OK** e então:
-               - Abra **Ajustes do Sistema → Privacidade e Segurança**, role até o final e clique **Abrir Assim Mesmo**; **ou**
-               - No Terminal: `xattr -dr com.apple.quarantine "/Applications/Packages NPM.app"`
+            **macOS** — build manual
+
+            O app não é distribuído pré-compilado para macOS: sem assinatura
+            Developer ID / notarização da Apple, o Gatekeeper bloqueia binários
+            baixados da internet. Compilando localmente o app não recebe o
+            atributo de quarentena e abre sem avisos.
+
+            Pré-requisitos: [Go 1.21+](https://go.dev/dl/) e Xcode Command Line
+            Tools (`xcode-select --install`).
+
+            ```bash
+            git clone https://github.com/dirsouza/packages-npm.git
+            cd packages-npm
+            git checkout ${{ github.ref_name }}
+            go install fyne.io/tools/cmd/fyne@latest
+            make package
+            mv "dist/Packages NPM.app" /Applications/
+            ```
+
+            O `.app` precisa estar em `/Applications` para funcionar
+            corretamente.
 
             **Linux**
             ```bash
@@ -181,5 +180,4 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             dist/packages-npm-linux-amd64.tar.xz
-            dist/packages-npm-darwin-arm64.dmg
             dist/packages-npm-windows-amd64.exe
