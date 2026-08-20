@@ -42,7 +42,36 @@ Permitindo instalar, desinstalar e gerenciar pacotes npm globais de forma centra
 
 ---
 
-## Instalação e execução
+## Instalação
+
+### 🐧 Linux / 🪟 Windows — binários prontos
+
+Baixe na página de [Releases](https://github.com/dirsouza/packages-npm/releases):
+
+| Plataforma | Arquivo |
+|---|---|
+| Linux | `packages-npm-linux-amd64.tar.xz` — extraia e rode `sudo make install` |
+| Windows | `packages-npm-windows-amd64.exe` — execute diretamente |
+
+### 🍎 macOS — build manual
+
+O app **não** é distribuído pré-compilado para macOS: sem assinatura Developer ID / notarização da Apple, o Gatekeeper bloqueia binários baixados da internet. Compilando localmente, o app não recebe o atributo de quarentena e abre sem avisos.
+
+Pré-requisitos: Go 1.21+ e Xcode Command Line Tools (veja tabela acima).
+
+```bash
+git clone https://github.com/dirsouza/packages-npm.git
+cd packages-npm
+go install fyne.io/tools/cmd/fyne@latest
+make package
+mv "dist/Packages NPM.app" /Applications/
+```
+
+> O `.app` precisa estar em `/Applications` para funcionar corretamente.
+
+---
+
+## Execução em desenvolvimento
 
 ```bash
 # 1. Clone o repositório
@@ -66,6 +95,7 @@ make build
 |---|---|
 | `make run` | Limpa, compila e executa |
 | `make build` | Gera binário em `bin/packages-npm` |
+| `make package` | Empacota com `fyne package` e move os artefatos para `dist/` |
 | `make tidy` | Sincroniza `go.mod` / `go.sum` |
 | `make clean` | Remove o diretório `bin/` |
 
