@@ -19,12 +19,7 @@ build:
 package: clean
 	@echo "Empacotando com fyne package..."
 	@mkdir -p dist
-	go build -ldflags "-s -w $(LDFLAGS)" -o bin/packages-npm-bin $(MAIN)
-	fyne package \
-		--executable bin/packages-npm-bin \
-		--appVersion $(VERSION) \
-		--appBuild $(BUILD_INT)
-	@rm -f bin/packages-npm-bin
+	fyne package --src $(MAIN)
 	@find . -maxdepth 1 -name "*.app"    -exec mv {} dist/ \;
 	@find . -maxdepth 1 -name "*.tar.gz" -exec mv {} dist/ \;
 	@find . -maxdepth 1 -name "*.exe"    -exec mv {} dist/ \;

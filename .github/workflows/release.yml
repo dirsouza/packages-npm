@@ -80,10 +80,7 @@ jobs:
       - name: Package (macOS)
         if: runner.os == 'macOS'
         run: |
-          fyne package \
-            --src ./cmd/app \
-            --appVersion ${{ steps.ver.outputs.version }} \
-            --appBuild ${{ steps.ver.outputs.build_int }}
+          fyne package --src ./cmd/app
           mkdir -p dist
           APP=$(find . -maxdepth 1 -name "*.app" | head -1)
           codesign --force --deep --sign "-" "$APP"
@@ -97,12 +94,12 @@ jobs:
       - name: Package (Linux)
         if: runner.os == 'Linux'
         run: |
-          fyne package \
-            --src ./cmd/app \
-            --appVersion ${{ steps.ver.outputs.version }} \
-            --appBuild ${{ steps.ver.outputs.build_int }}
+          fyne package --src ./cmd/app
+          echo "=== arquivos gerados ===" && ls -la
           mkdir -p dist
-          find . -maxdepth 1 -name "*.tar.gz" -exec mv {} dist/packages-npm-linux-amd64.tar.gz \;
+          TAR=$(find . -maxdepth 1 -name "*.tar.gz" | head -1)
+          if [ -z "$TAR" ]; then echo "ERRO: nenhum .tar.gz gerado"; exit 1; fi
+          mv "$TAR" dist/packages-npm-linux-amd64.tar.gz
 
       # ── Windows: .exe com ícone embutido ─────────────────────────────────
       - name: Package (Windows)
@@ -112,12 +109,12 @@ jobs:
           $env:PATH = "$env:PATH;$(go env GOPATH)\bin"
           $env:CGO_ENABLED = "1"
           $env:CC = "gcc"
-          fyne package `
-            --src ./cmd/app `
-            --appVersion ${{ steps.ver.outputs.version }} `
-            --appBuild ${{ steps.ver.outputs.build_int }}
+          fyne package --src ./cmd/app
+          Write-Host "=== arquivos gerados ===" ; Get-ChildItem | Select-Object Name
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Get-ChildItem -Filter "*.exe" | Where-Object { $_.Name -ne "app-bin.exe" } | Move-Item -Destination dist/packages-npm-windows-amd64.exe
+          $exe = Get-ChildItem -Filter "*.exe" | Where-Object { $_.Name -ne "app-bin.exe" } | Select-Object -First 1
+          if (-not $exe) { Write-Error "ERRO: nenhum .exe gerado"; exit 1 }
+          Move-Item $exe.FullName dist/packages-npm-windows-amd64.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
