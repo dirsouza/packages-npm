@@ -17,7 +17,7 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact: packages-npm-linux-amd64.tar.gz
+            artifact: packages-npm-linux-amd64.tar.xz
           - os: macos-latest
             artifact: packages-npm-darwin-arm64.dmg
           - os: windows-latest
@@ -96,16 +96,16 @@ jobs:
             -ov -format UDZO \
             "dist/packages-npm-darwin-arm64.dmg"
 
-      # ── Linux: .tar.gz com .desktop entry ────────────────────────────────
+      # ── Linux: .tar.xz com .desktop entry ────────────────────────────────
       - name: Package (Linux)
         if: runner.os == 'Linux'
         run: |
           fyne package --src ./cmd/app
-          echo "=== arquivos gerados ===" && ls -la
+          echo "=== arquivos gerados ===" && ls -la . cmd/app
           mkdir -p dist
-          TAR=$(find . -maxdepth 1 -name "*.tar.gz" | head -1)
-          if [ -z "$TAR" ]; then echo "ERRO: nenhum .tar.gz gerado"; exit 1; fi
-          mv "$TAR" dist/packages-npm-linux-amd64.tar.gz
+          TAR=$(find . -maxdepth 2 -not -path "./dist/*" \( -name "*.tar.xz" -o -name "*.tar.gz" \) | head -1)
+          if [ -z "$TAR" ]; then echo "ERRO: nenhum tarball gerado"; exit 1; fi
+          mv "$TAR" dist/packages-npm-linux-amd64.tar.xz
 
       # ── Windows: .exe com ícone embutido ─────────────────────────────────
       - name: Package (Windows)
@@ -116,10 +116,17 @@ jobs:
           $env:CGO_ENABLED = "1"
           $env:CC = "gcc"
           fyne package --src ./cmd/app
-          Write-Host "=== arquivos gerados ===" ; Get-ChildItem | Select-Object Name
+          if ($LASTEXITCODE -ne 0) { Write-Error "ERRO: fyne package falhou (exit $LASTEXITCODE)"; exit 1 }
+          Write-Host "=== arquivos gerados ==="
+          Get-ChildItem -Recurse -Depth 2 -File |
+            Where-Object { $_.FullName -notmatch '\\\.git\\' } |
+            Select-Object -ExpandProperty FullName | Out-String | Write-Host
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          $exe = Get-ChildItem -Filter "*.exe" | Where-Object { $_.Name -ne "app-bin.exe" } | Select-Object -First 1
+          $exe = Get-ChildItem -Recurse -Depth 2 -Filter "*.exe" -File |
+            Where-Object { $_.FullName -notmatch '\\dist\\' -and $_.Name -notmatch '-bin\.exe$' } |
+            Select-Object -First 1
           if (-not $exe) { Write-Error "ERRO: nenhum .exe gerado"; exit 1 }
+          Write-Host "=== usando: $($exe.FullName) ==="
           Move-Item $exe.FullName dist/packages-npm-windows-amd64.exe
 
       - name: Upload artifact
@@ -158,7 +165,7 @@ jobs:
             | Plataforma | Arquivo | Tipo |
             |---|---|---|
             | 🍎 macOS (Apple Silicon) | `packages-npm-darwin-arm64.dmg` | Disk Image (arraste para /Applications) |
-            | 🐧 Linux | `packages-npm-linux-amd64.tar.gz` | Tarball + .desktop entry |
+            | 🐧 Linux | `packages-npm-linux-amd64.tar.xz` | Tarball + .desktop entry |
             | 🪟 Windows | `packages-npm-windows-amd64.exe` | Executável com ícone embutido |
 
             ### Instalação
@@ -172,10 +179,10 @@ jobs:
 
             **Linux**
             ```bash
-            tar -xzf packages-npm-linux-amd64.tar.gz
-            chmod +x packages-npm
-            ./packages-npm
-            # Opcional: copie o .desktop para ~/.local/share/applications/
+            mkdir packages-npm && tar -xJf packages-npm-linux-amd64.tar.xz -C packages-npm
+            cd packages-npm
+            sudo make install   # instala binário, ícone e .desktop em /usr/local
+            # Ou execute direto o binário em usr/local/bin/ sem instalar
             ```
 
             **Windows**
@@ -186,6 +193,6 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
-            dist/packages-npm-linux-amd64.tar.gz
+            dist/packages-npm-linux-amd64.tar.xz
             dist/packages-npm-darwin-arm64.dmg
             dist/packages-npm-windows-amd64.exe
