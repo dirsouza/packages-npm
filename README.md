@@ -63,11 +63,12 @@ Pré-requisitos: Go 1.21+ e Xcode Command Line Tools (veja tabela acima).
 git clone https://github.com/dirsouza/packages-npm.git
 cd packages-npm
 go install fyne.io/tools/cmd/fyne@latest
-make package
-mv "dist/Packages NPM.app" /Applications/
+make package-macos
 ```
 
-> O `.app` precisa estar em `/Applications` para funcionar corretamente.
+O comando gera o `Packages NPM.app`, empacota um instalador `dist/packages-npm-<versão>.pkg` (que instala em `/Applications`) e já instala o `.app` em `/Applications` — ou em `~/Applications` caso o usuário não tenha permissão de escrita (Macs gerenciados). Ao final, o `.app` intermediário é removido e apenas o `.pkg` permanece em `dist/`.
+
+> O `.app` precisa estar em uma pasta Applications (`/Applications` ou `~/Applications`) para funcionar corretamente.
 
 ---
 
@@ -96,6 +97,7 @@ make build
 | `make run` | Limpa, compila e executa |
 | `make build` | Gera binário em `bin/packages-npm` |
 | `make package` | Empacota com `fyne package` e move os artefatos para `dist/` |
+| `make package-macos` | Gera `.app` + instalador `.pkg` e instala em Applications (macOS) |
 | `make tidy` | Sincroniza `go.mod` / `go.sum` |
 | `make clean` | Remove o diretório `bin/` |
 

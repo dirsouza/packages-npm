@@ -156,11 +156,16 @@ jobs:
             cd packages-npm
             git checkout ${{ github.ref_name }}
             go install fyne.io/tools/cmd/fyne@latest
-            make package
-            mv "dist/Packages NPM.app" /Applications/
+            make package-macos
             ```
 
-            O `.app` precisa estar em `/Applications` para funcionar
+            O comando gera o `Packages NPM.app`, empacota um instalador
+            `dist/packages-npm-<versão>.pkg` (que instala em `/Applications`)
+            e já instala o `.app` em `/Applications` — ou em `~/Applications`
+            caso o usuário não tenha permissão de escrita. Ao final, apenas o
+            `.pkg` permanece em `dist/`.
+
+            O `.app` precisa estar em uma pasta Applications para funcionar
             corretamente.
 
             **Linux**
