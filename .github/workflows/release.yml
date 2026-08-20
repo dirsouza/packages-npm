@@ -19,7 +19,7 @@ jobs:
           - os: ubuntu-latest
             artifact: packages-npm-linux-amd64.tar.gz
           - os: macos-latest
-            artifact: packages-npm-darwin-amd64.dmg
+            artifact: packages-npm-darwin-arm64.dmg
           - os: windows-latest
             artifact: packages-npm-windows-amd64.exe
 
@@ -76,6 +76,12 @@ jobs:
         shell: pwsh
         run: go install fyne.io/tools/cmd/fyne@latest
 
+      # fyne package --src procura FyneApp.toml no diretório do source —
+      # sem ele o bundle sai como "app.app" e sem metadados
+      - name: Copy FyneApp.toml into source dir
+        shell: bash
+        run: cp FyneApp.toml cmd/app/
+
       # ── macOS: .app bundle → .dmg ─────────────────────────────────────────
       - name: Package (macOS)
         if: runner.os == 'macOS'
@@ -88,7 +94,7 @@ jobs:
             -volname "Packages NPM" \
             -srcfolder "$APP" \
             -ov -format UDZO \
-            "dist/packages-npm-darwin-amd64.dmg"
+            "dist/packages-npm-darwin-arm64.dmg"
 
       # ── Linux: .tar.gz com .desktop entry ────────────────────────────────
       - name: Package (Linux)
@@ -151,16 +157,18 @@ jobs:
 
             | Plataforma | Arquivo | Tipo |
             |---|---|---|
-            | 🍎 macOS | `packages-npm-darwin-amd64.dmg` | Disk Image (arraste para /Applications) |
+            | 🍎 macOS (Apple Silicon) | `packages-npm-darwin-arm64.dmg` | Disk Image (arraste para /Applications) |
             | 🐧 Linux | `packages-npm-linux-amd64.tar.gz` | Tarball + .desktop entry |
             | 🪟 Windows | `packages-npm-windows-amd64.exe` | Executável com ícone embutido |
 
             ### Instalação
 
             **macOS**
-            1. Abra `packages-npm-darwin-amd64.dmg`
+            1. Abra `packages-npm-darwin-arm64.dmg`
             2. Arraste `Packages NPM.app` para `/Applications`
-            3. Na primeira execução: botão direito → **Abrir**
+            3. Na primeira abertura o macOS avisará que não pôde verificar o app (o app não é notarizado pela Apple). Clique **OK** e então:
+               - Abra **Ajustes do Sistema → Privacidade e Segurança**, role até o final e clique **Abrir Assim Mesmo**; **ou**
+               - No Terminal: `xattr -dr com.apple.quarantine "/Applications/Packages NPM.app"`
 
             **Linux**
             ```bash
@@ -179,5 +187,5 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             dist/packages-npm-linux-amd64.tar.gz
-            dist/packages-npm-darwin-amd64.dmg
+            dist/packages-npm-darwin-arm64.dmg
             dist/packages-npm-windows-amd64.exe
