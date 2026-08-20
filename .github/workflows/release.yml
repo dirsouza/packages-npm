@@ -17,9 +17,7 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact: packages-npm-linux-amd64.tar.gz
-          - os: macos-latest
-            artifact: packages-npm-darwin-amd64.dmg
+            artifact: packages-npm-linux-amd64.tar.xz
           - os: windows-latest
             artifact: packages-npm-windows-amd64.exe
 
@@ -56,19 +54,9 @@ jobs:
         shell: pwsh
         run: echo "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      # ── Read version from FyneApp.toml ───────────────────────────────────
-      - name: Read version info
-        id: ver
-        shell: bash
-        run: |
-          echo "version=$(grep -E '^Version\s*=' FyneApp.toml | sed 's/.*\"\(.*\)\".*/\1/')" >> "$GITHUB_OUTPUT"
-          BUILD=$(grep -E '^Build\s*=' FyneApp.toml | sed 's/.*"\(.*\)".*/\1/')
-          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
-          echo "build_int=$((10#$BUILD))" >> "$GITHUB_OUTPUT"
-
       # ── Install fyne CLI ──────────────────────────────────────────────────
-      - name: Install fyne CLI (Linux / macOS)
-        if: runner.os != 'Windows'
+      - name: Install fyne CLI (Linux)
+        if: runner.os == 'Linux'
         run: go install fyne.io/tools/cmd/fyne@latest
 
       - name: Install fyne CLI (Windows)
@@ -76,38 +64,23 @@ jobs:
         shell: pwsh
         run: go install fyne.io/tools/cmd/fyne@latest
 
-      # ── macOS: .app bundle → .dmg ─────────────────────────────────────────
-      - name: Package (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          go build \
-            -ldflags "-s -w -X main.Version=${{ steps.ver.outputs.version }} -X main.Build=${{ steps.ver.outputs.build }}" \
-            -o bin/app-bin ./cmd/app
-          fyne package \
-            --executable bin/app-bin \
-            --appVersion ${{ steps.ver.outputs.version }} \
-            --appBuild ${{ steps.ver.outputs.build_int }}
-          mkdir -p dist
-          APP=$(find . -maxdepth 1 -name "*.app" | head -1)
-          hdiutil create \
-            -volname "Packages NPM" \
-            -srcfolder "$APP" \
-            -ov -format UDZO \
-            "dist/packages-npm-darwin-amd64.dmg"
+      # fyne package precisa do FyneApp.toml junto do source; sem ele (ou com
+      # TOML inválido — Build deve ser inteiro) o bundle sai como "app" e sem
+      # metadados (com.example.app)
+      - name: Copy FyneApp.toml into source dir
+        shell: bash
+        run: cp FyneApp.toml cmd/app/
 
-      # ── Linux: .tar.gz com .desktop entry ────────────────────────────────
+      # ── Linux: .tar.xz com .desktop entry ────────────────────────────────
       - name: Package (Linux)
         if: runner.os == 'Linux'
         run: |
-          go build \
-            -ldflags "-s -w -X main.Version=${{ steps.ver.outputs.version }} -X main.Build=${{ steps.ver.outputs.build }}" \
-            -o bin/app-bin ./cmd/app
-          fyne package \
-            --executable bin/app-bin \
-            --appVersion ${{ steps.ver.outputs.version }} \
-            --appBuild ${{ steps.ver.outputs.build_int }}
+          fyne package --src ./cmd/app
+          echo "=== arquivos gerados ===" && ls -la . cmd/app
           mkdir -p dist
-          find . -maxdepth 1 -name "*.tar.gz" -exec mv {} dist/packages-npm-linux-amd64.tar.gz \;
+          TAR=$(find . -maxdepth 2 -not -path "./dist/*" \( -name "*.tar.xz" -o -name "*.tar.gz" \) | head -1)
+          if [ -z "$TAR" ]; then echo "ERRO: nenhum tarball gerado"; exit 1; fi
+          mv "$TAR" dist/packages-npm-linux-amd64.tar.xz
 
       # ── Windows: .exe com ícone embutido ─────────────────────────────────
       - name: Package (Windows)
@@ -117,15 +90,19 @@ jobs:
           $env:PATH = "$env:PATH;$(go env GOPATH)\bin"
           $env:CGO_ENABLED = "1"
           $env:CC = "gcc"
-          go build `
-            -ldflags "-s -w -H windowsgui -X main.Version=${{ steps.ver.outputs.version }} -X main.Build=${{ steps.ver.outputs.build }}" `
-            -o bin/app-bin.exe ./cmd/app
-          fyne package `
-            --executable bin/app-bin.exe `
-            --appVersion ${{ steps.ver.outputs.version }} `
-            --appBuild ${{ steps.ver.outputs.build_int }}
+          fyne package --src ./cmd/app
+          if ($LASTEXITCODE -ne 0) { Write-Error "ERRO: fyne package falhou (exit $LASTEXITCODE)"; exit 1 }
+          Write-Host "=== arquivos gerados ==="
+          Get-ChildItem -Recurse -Depth 2 -File |
+            Where-Object { $_.FullName -notmatch '\\\.git\\' } |
+            Select-Object -ExpandProperty FullName | Out-String | Write-Host
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Get-ChildItem -MaxDepth 1 -Filter "*.exe" | Where-Object { $_.Name -ne "app-bin.exe" } | Move-Item -Destination dist/packages-npm-windows-amd64.exe
+          $exe = Get-ChildItem -Recurse -Depth 2 -Filter "*.exe" -File |
+            Where-Object { $_.FullName -notmatch '\\dist\\' -and $_.Name -notmatch '-bin\.exe$' } |
+            Select-Object -First 1
+          if (-not $exe) { Write-Error "ERRO: nenhum .exe gerado"; exit 1 }
+          Write-Host "=== usando: $($exe.FullName) ==="
+          Move-Item $exe.FullName dist/packages-npm-windows-amd64.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -140,10 +117,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-
-      - name: Read version
-        id: ver
-        run: echo "version=$(grep -E '^Version\s*=' FyneApp.toml | sed 's/.*\"\(.*\)\".*/\1/')" >> "$GITHUB_OUTPUT"
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -162,23 +135,45 @@ jobs:
 
             | Plataforma | Arquivo | Tipo |
             |---|---|---|
-            | 🍎 macOS | `packages-npm-darwin-amd64.dmg` | Disk Image (arraste para /Applications) |
-            | 🐧 Linux | `packages-npm-linux-amd64.tar.gz` | Tarball + .desktop entry |
+            | 🐧 Linux | `packages-npm-linux-amd64.tar.xz` | Tarball + .desktop entry |
             | 🪟 Windows | `packages-npm-windows-amd64.exe` | Executável com ícone embutido |
+            | 🍎 macOS | — | Build manual (veja instruções abaixo) |
 
             ### Instalação
 
-            **macOS**
-            1. Abra `packages-npm-darwin-amd64.dmg`
-            2. Arraste `Packages NPM.app` para `/Applications`
-            3. Na primeira execução: botão direito → **Abrir**
+            **macOS** — build manual
+
+            O app não é distribuído pré-compilado para macOS: sem assinatura
+            Developer ID / notarização da Apple, o Gatekeeper bloqueia binários
+            baixados da internet. Compilando localmente o app não recebe o
+            atributo de quarentena e abre sem avisos.
+
+            Pré-requisitos: [Go 1.21+](https://go.dev/dl/) e Xcode Command Line
+            Tools (`xcode-select --install`).
+
+            ```bash
+            git clone https://github.com/dirsouza/packages-npm.git
+            cd packages-npm
+            git checkout ${{ github.ref_name }}
+            go install fyne.io/tools/cmd/fyne@latest
+            make package-macos
+            ```
+
+            O comando gera o `Packages NPM.app`, empacota um instalador
+            `dist/packages-npm-<versão>.pkg` (que instala em `/Applications`)
+            e já instala o `.app` em `/Applications` — ou em `~/Applications`
+            caso o usuário não tenha permissão de escrita. Ao final, apenas o
+            `.pkg` permanece em `dist/`.
+
+            O `.app` precisa estar em uma pasta Applications para funcionar
+            corretamente.
 
             **Linux**
             ```bash
-            tar -xzf packages-npm-linux-amd64.tar.gz
-            chmod +x packages-npm
-            ./packages-npm
-            # Opcional: copie o .desktop para ~/.local/share/applications/
+            mkdir packages-npm && tar -xJf packages-npm-linux-amd64.tar.xz -C packages-npm
+            cd packages-npm
+            sudo make install   # instala binário, ícone e .desktop em /usr/local
+            # Ou execute direto o binário em usr/local/bin/ sem instalar
             ```
 
             **Windows**
@@ -189,6 +184,5 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
-            dist/packages-npm-linux-amd64.tar.gz
-            dist/packages-npm-darwin-amd64.dmg
+            dist/packages-npm-linux-amd64.tar.xz
             dist/packages-npm-windows-amd64.exe

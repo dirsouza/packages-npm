@@ -17,6 +17,9 @@ coverage.txt
 # Fyne cache de build (cross-compile)
 fyne-cross/
 
+# Cópia do FyneApp.toml feita pelo CI para o fyne package --src
+cmd/app/FyneApp.toml
+
 # ── Banco de dados local (gerado em runtime) ──────────────────────────────────
 *.db
 *.db-shm
