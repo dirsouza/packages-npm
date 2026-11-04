@@ -66,9 +66,13 @@ go install fyne.io/tools/cmd/fyne@latest
 make package-macos
 ```
 
-O comando gera o `Packages NPM.app`, empacota um instalador `dist/packages-npm-<versão>.pkg` (que instala em `/Applications`) e já instala o `.app` em `/Applications` — ou em `~/Applications` caso o usuário não tenha permissão de escrita (Macs gerenciados). Ao final, o `.app` intermediário é removido e apenas o `.pkg` permanece em `dist/`.
+O comando apenas gera o instalador `dist/packages-npm-<versão>.pkg` — nada é instalado. Ao abrir o `.pkg`, o `Packages NPM.app` é instalado em `~/Applications` (somente para o usuário atual), sem exigir permissão de administrador — funciona também em Macs gerenciados.
 
-> O `.app` precisa estar em uma pasta Applications (`/Applications` ou `~/Applications`) para funcionar corretamente.
+Para instalar pelo terminal:
+
+```bash
+installer -pkg dist/packages-npm-<versão>.pkg -target CurrentUserHomeDirectory
+```
 
 ---
 
@@ -92,14 +96,19 @@ make build
 
 ### Comandos disponíveis
 
+Rode `make` (ou `make help`) para ver o menu com todos os alvos.
+
 | Comando | Descrição |
 |---|---|
+| `make help` | Mostra o menu de comandos (alvo padrão) |
 | `make run` | Limpa, compila e executa |
 | `make build` | Gera binário em `bin/packages-npm` |
+| `make fmt` | Formata o código (`go fmt`) |
+| `make lint` | Roda o `golangci-lint` |
 | `make package` | Empacota com `fyne package` e move os artefatos para `dist/` |
-| `make package-macos` | Gera `.app` + instalador `.pkg` e instala em Applications (macOS) |
+| `make package-macos` | Gera o instalador `.pkg` em `dist/` (instala em `~/Applications`) — macOS |
 | `make tidy` | Sincroniza `go.mod` / `go.sum` |
-| `make clean` | Remove o diretório `bin/` |
+| `make clean` | Remove os diretórios `bin/` e `dist/` |
 
 ---
 
