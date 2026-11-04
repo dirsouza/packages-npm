@@ -4,5 +4,5 @@ Website = "https://github.com/dirsouza/packages-npm"
 Icon    = "Icon.png"
 Name    = "Packages NPM"
 ID      = "com.dirsouza.packages-npm"
-Version = "1.0.0"
+Version = "1.0.1"
 Build   = 1
