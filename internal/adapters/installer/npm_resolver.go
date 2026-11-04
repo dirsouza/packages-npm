@@ -65,6 +65,11 @@ func resolveNpmUnix(found func(string) (npmLocation, error)) (npmLocation, error
 		return found(p)
 	}
 
+	// asdf
+	if p, err := resolveAsdfNpm(home); err == nil {
+		return found(p)
+	}
+
 	// fnm — newest version installed
 	if p, err := globLast(filepath.Join(home, ".local", "share", "fnm", "node-versions", "*", "installation", "bin", "npm")); err == nil {
 		return found(p)
