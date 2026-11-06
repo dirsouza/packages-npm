@@ -1,6 +1,6 @@
-# CLAUDE.md — Instruções de Design para IA
+# AGENTS.md — Instruções de Design para IA
 
-Este arquivo orienta assistentes de IA (GitHub Copilot, Claude, ChatGPT, etc.) sobre as convenções, regras arquiteturais e padrões de código deste projeto. **Leia e respeite tudo aqui antes de gerar ou sugerir qualquer código.**
+Este arquivo orienta assistentes de IA sobre as convenções, regras arquiteturais e padrões de código deste projeto. **Leia e respeite tudo aqui antes de gerar ou sugerir qualquer código.**
 
 ---
 
@@ -8,10 +8,22 @@ Este arquivo orienta assistentes de IA (GitHub Copilot, Claude, ChatGPT, etc.) s
 
 `packages-npm` é um **app desktop em Go + Fyne** para gerenciar pacotes npm globais.
 
-- **Linguagem:** Go 1.21+
-- **UI:** Fyne v2.8 (OpenGL/Metal, cross-platform)
-- **Banco:** SQLite via `modernc.org/sqlite` (pure Go, sem CGo)
+- **Linguagem:** Go 1.26+ (conforme `go.mod`)
+- **UI:** Fyne v2.8 (OpenGL/Metal, cross-platform: macOS, Linux e Windows)
+- **Banco:** SQLite via `modernc.org/sqlite` (driver pure Go)
 - **Módulo Go:** `github.com/dirsouza/packages-npm`
+
+---
+
+## Preparação do ambiente
+
+- **Go** na versão do `go.mod` e **Node.js/npm** (necessário em runtime para instalar e verificar pacotes)
+- **Compilador C e libs gráficas** (o Fyne usa CGo e OpenGL/Metal):
+  - macOS: `xcode-select --install`
+  - Linux: `sudo apt-get install gcc libgl1-mesa-dev xorg-dev libwayland-dev libxkbcommon-dev`
+  - Windows: GCC do MinGW-w64 (o CI usa `mingw-w64-x86_64-gcc` via MSYS2)
+- **fyne CLI** (para `make package*`): `go install fyne.io/tools/cmd/fyne@latest`
+- **golangci-lint v2** (para `make lint`; o `.golangci.yml` usa `version: "2"`): `brew install golangci-lint` ou `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest`
 
 ---
 
@@ -21,15 +33,16 @@ O projeto segue **Clean Architecture + Hexagonal (Ports & Adapters)** com **DDD*
 
 ### Direção das dependências
 
-```
+```text
 UI  →  inbound port  →  core (domain + usecases)  ←  outbound ports  ←  adapters
 ```
 
 **Regras:**
+
 1. **O domínio não importa nada** do projeto — apenas stdlib
 2. **Use cases (`usecases/`)** importam somente `domain` e `ports`
 3. **Inbound ports (`ports/inbound/`)** importam somente `domain` e `ports/outbound`
-4. **Adapters** (`adapters/`, `infrastructure/`) são os únicos que importam libs externas (SQLite, Fyne, etc.)
+4. **Libs externas ficam nas bordas**: o driver SQLite só em `infrastructure/database/` (e `database/sql` só em `adapters/persistence/`); o Fyne só em `ui/`
 5. **A UI** (`ui/`) importa somente `ports/inbound`, `domain` e seus próprios pacotes
 6. **`cmd/app/`** é o único lugar que conhece todas as camadas — é o composition root
 
@@ -48,8 +61,8 @@ UI  →  inbound port  →  core (domain + usecases)  ←  outbound ports  ←  
 
 ## Estrutura de pacotes
 
-```
-cmd/app/           → composition root (main.go + seed.go)
+```text
+cmd/app/           → composition root (main.go, seed.go, version.go)
 internal/
   core/
     domain/        → entidades, value objects, erros, tipos de aplicação
@@ -59,7 +72,7 @@ internal/
     usecases/      → PackageService — implementa PackageUseCase
   adapters/
     persistence/   → SQLitePackageRepository
-    installer/     → NpmInstaller, NpmPackageChecker
+    installer/     → NpmInstaller, NpmPackageChecker, resolução do npm (npm_resolver.go, asdf.go)
     backup/        → CSVBackupStorage
   infrastructure/
     database/      → Connection (abre/fecha sql.DB)
@@ -81,7 +94,7 @@ ui/
 type Package struct {
     ID          int64
     DisplayName string      // obrigatório, validado por Validate()
-    Name        PackageName // value object — não vazio, npm-válido
+    Name        PackageName // value object — não vazio
     Version     Version     // value object — semver, range, dist-tag ou vazio
     CreatedAt   time.Time
     UpdatedAt   time.Time
@@ -92,7 +105,7 @@ type Package struct {
 
 ### Value Objects
 
-- `PackageName`: imutável, validado em `NewPackageName(raw string)`
+- `PackageName`: imutável, criado por `NewPackageName(raw string)` (faz trim e rejeita vazio)
 - `Version`: aceita versão exata (`5.0.0`), ranges (`^5`, `~1.2`, `>=2`), wildcards (`1.x`, `*`) e dist-tags (`latest`, `beta`). Vazio = `latest`.
 
 ### Tipos de aplicação (`domain/types.go`)
@@ -102,11 +115,11 @@ type SortOrder uint8   // SortByDisplayName | SortByID
 type ImportMode uint8  // ImportMerge | ImportReplace
 ```
 
-Estes tipos vivem no domínio para evitar que `inbound` importe `outbound`.
+Estes tipos vivem no domínio porque são usados tanto pela UI (via `inbound`) quanto pelos adapters (via `outbound`).
 
 ### Erros de domínio (`domain/errors.go`)
 
-Sempre use erros tipados do domínio. Nunca retorne `errors.New("package not found")` — use `domain.ErrPackageNotFound`.
+Sempre use erros tipados do domínio (`ErrEmptyDisplayName`, `ErrEmptyPackageName`, `ErrInvalidVersion`, `ErrPackageNotFound`, `ErrDuplicatePackage`, `ErrInstallFailed`, `ErrUninstallFailed`, `ErrNoPackageSelected`). Nunca retorne `errors.New(...)` avulso no domínio; adapters adicionam contexto com `fmt.Errorf("%w: ...", domain.ErrXxx)`.
 
 ---
 
@@ -119,7 +132,7 @@ Sempre use erros tipados do domínio. Nunca retorne `errors.New("package not fou
 ### Outbound — `ports/outbound/`
 
 | Interface | Responsabilidade |
-|---|---|
+| --- | --- |
 | `PackageRepository` | CRUD + ReplaceAll + Restore |
 | `PackageInstaller` | Install / Uninstall via npm |
 | `PackageChecker` | ListGlobalInstalled via npm list |
@@ -179,6 +192,7 @@ go func() {
 ### Tema (`ui/uitheme/DarkTheme`)
 
 Paleta definida:
+
 - Background: `#0F172A` (Navy escuro)
 - Card: `#27374F`
 - Primary/Accent: `#6366F1` (Indigo)
@@ -186,9 +200,20 @@ Paleta definida:
 
 ---
 
+## Execução do npm (`internal/adapters/installer/`)
+
+O app é aberto pelo Finder/menu do sistema e **não recebe o `PATH` do shell**. Por isso `newNpmCmd` resolve o npm por caminho absoluto e adiciona o diretório dele ao `PATH` do processo filho (o npm precisa achar o `node`).
+
+- Ordem de busca (`resolveNpm`): `PATH` do processo → Homebrew/sistema/n → Volta → asdf → fnm → nvm (alias `default`, depois a mais recente); no Windows: instalador oficial, Volta, nvm-windows, fnm, Scoop, Chocolatey
+- **asdf** (`asdf.go`): usa `ASDF_NODEJS_VERSION` ou o `~/.tool-versions` global e aponta direto para `installs/nodejs/<versão>/bin/npm` (os shims dependem do binário `asdf` no `PATH`); fallback para a maior versão executável. Após install/uninstall, roda `asdf reshim nodejs`
+- Todo candidato passa por `isExecutable`; caminhos comparados já normalizados (`absolutePath`); versões comparadas numericamente (`compareVersions`)
+- O alvo do npm é `Package.InstallTarget()` (`nome@versão`), montado a partir dos value objects
+
+---
+
 ## Banco de dados (SQLite)
 
-- Driver: `modernc.org/sqlite` registrado como `"sqlite"` (não `"sqlite3"`)
+- Driver: `modernc.org/sqlite`, aberto com o nome `"sqlite"`
 - Conexão gerenciada em `infrastructure/database/Connection`; o composition root (`main.go`) controla o lifecycle com `defer conn.Close()`
 - Migrations via `ALTER TABLE ADD COLUMN` com tratamento de "duplicate column name" (idempotente)
 - Timestamps: `created_at` e `updated_at` preenchidos em `Save` e `Update`; `FindAll` ordena por `domain.SortOrder`
@@ -213,26 +238,65 @@ Paleta definida:
 
 ---
 
+## Segurança
+
+Resumo das regras; o detalhamento está em `.github/instructions/security.instructions.md`.
+
+- **npm:** nome e versão vindos da UI ou do CSV só chegam ao npm via `NewPackageName`/`NewVersion` → `InstallTarget()` (valor começando com `-` viraria flag do npm). Execução sempre com `exec.Cmd` (`Path` absoluto + `Args`), nunca pelo diretório corrente
+- **Ambiente do usuário:** o npm herda `os.Environ()` e lê o `~/.npmrc` (podem conter tokens) — nunca exibir na UI nem logar esse conteúdo; nunca desligar a verificação TLS do registry (`--strict-ssl=false`, `NODE_TLS_REJECT_UNAUTHORIZED=0`)
+- **SQL:** valores sempre como parâmetro `?`; partes dinâmicas da query só via whitelist (`sortColumn`) ou lista de placeholders
+- **CSV importado** é entrada externa: validar cada linha antes de gravar e manter o `ReplaceAll` transacional
+- **Empacotamento:** o `.pkg` instala só no domínio do usuário, sem scripts de pré/pós-instalação
+- **CI:** não ampliar `permissions` dos workflows; dependência ou action nova exige justificativa na PR
+
+---
+
 ## Comandos de build e verificação
 
 ```bash
 go build ./...          # compila todos os pacotes
 go vet ./...            # análise estática
-go build -o bin/packages-npm ./cmd/app   # gera o binário
+make                    # menu com todos os alvos (make help)
+make fmt                # go fmt ./...
+make lint               # golangci-lint (config em .golangci.yml: gosec, cyclop, gocognit, revive...)
 make run                # limpa, compila e executa
-make build              # apenas compila
+make build              # compila bin/packages-npm com Version/Build do FyneApp.toml
+make package            # fyne package para o SO atual (artefatos em dist/)
+make package-macos      # gera o instalador .pkg em dist/ (instala em ~/Applications)
 make tidy               # go mod tidy
-make clean              # remove bin/
+make clean              # remove bin/ e dist/
 ```
 
-**Após qualquer alteração de código:** sempre rode `go build ./...` e `go vet ./...` antes de considerar a tarefa concluída.
+**Após qualquer alteração de código:** rode `go build ./...`, `go vet ./...`, `make fmt` e `make lint` — o CI (`ci.yml`) reprova código não formatado ou com achados do golangci-lint.
+
+**Comandos que agentes não devem rodar para verificar:** `make run` abre a janela do app e não termina sozinho; `make run`, `make package` e `make package-macos` executam `clean` e apagam `bin/` e `dist/`. Use-os só quando o usuário pedir.
+
+**Testes:** o projeto ainda não tem suíte de testes. Ao adicionar, priorize lógica pura (domínio, resolução de versão/caminho do installer).
+
+---
+
+## Fluxo de branches, versão e commits
+
+- **Branches:** PRs para `develop` só de `feat/*` ou `fix/*`; PRs para `main` só de `develop` ou `hotfix/*` (validado no `ci.yml`)
+- **Versão:** `Version` e `Build` ficam no `FyneApp.toml` (lidos pelo `Makefile` e pelo `fyne package`; injetados em `cmd/app/version.go` via `-ldflags`). A cada release, suba `Version` (semver) e incremente `Build`
+- **Release:** a tag `v*.*.*` dispara o `release.yml` (Linux e Windows); o `.pkg` do macOS é gerado manualmente com `make package-macos`
+- **Commits:** Conventional Commits com descrição em pt-BR — `tipo(escopo): descrição` (escopos usados: `installer`, `release`, `build`, `review`, `security`)
+
+---
+
+## Instruções do Copilot
+
+Lidas apenas pelo GitHub Copilot (code review e cloud agent); as regras essenciais já estão neste arquivo.
+
+- `.github/instructions/pt-br-review.instructions.md` — idioma, deduplicação e contexto de risco do code review
+- `.github/instructions/security.instructions.md` — detalhamento das regras de segurança
 
 ---
 
 ## Convenções de nomenclatura
 
 | Contexto | Convenção | Exemplo |
-|---|---|---|
+| --- | --- | --- |
 | Interfaces | Substantivo + sufixo semântico | `PackageRepository`, `BackupStorage` |
 | Implementações | Prefixo tecnológico + nome da interface | `SQLitePackageRepository`, `CSVBackupStorage` |
 | Construtores | `New` + tipo | `NewPackageService`, `NewMainWindow` |
@@ -252,20 +316,4 @@ make clean              # remove bin/
 5. **Crie o adapter** implementando a interface outbound
 6. **Wire em `cmd/app/main.go`** — composition root é o único lugar com visão total
 7. **Propague `fyne.Do`** em qualquer mutação de UI vinda de goroutine
-8. **Valide com** `go build ./...` e `go vet ./...` antes de encerrar
-
----
-
-## O que NÃO fazer (resumo rápido)
-
-| ❌ Proibido | ✅ Correto |
-|---|---|
-| Lógica de negócio na UI | Use case ou domínio |
-| `sql.DB` fora de adapters | `PackageRepository` via porta |
-| `exec.Command` fora de adapters | `PackageInstaller` / `PackageChecker` via porta |
-| Estado global mutável | Injeção de dependências |
-| Mutação de UI em goroutine sem `fyne.Do` | Sempre `fyne.Do(func(){...})` |
-| `errors.New("mensagem genérica")` no domínio | `domain.ErrXxx` tipado |
-| Duplicar `NewPackageName + NewVersion + Validate` | `packageFromDTO(dto)` |
-| Seed no repositório | `cmd/app/seed.go` |
-| Aliases de tipo sem uso externo real | Remova (YAGNI) |
+8. **Valide com** `go build ./...`, `go vet ./...`, `make fmt` e `make lint` antes de encerrar
