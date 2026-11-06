@@ -94,7 +94,7 @@ ui/
 type Package struct {
     ID          int64
     DisplayName string      // obrigatório, validado por Validate()
-    Name        PackageName // value object — não vazio
+    Name        PackageName // value object — não vazio, não começa com "-"
     Version     Version     // value object — semver, range, dist-tag ou vazio
     CreatedAt   time.Time
     UpdatedAt   time.Time
@@ -105,7 +105,7 @@ type Package struct {
 
 ### Value Objects
 
-- `PackageName`: imutável, criado por `NewPackageName(raw string)` (faz trim e rejeita vazio)
+- `PackageName`: imutável, criado por `NewPackageName(raw string)` (faz trim; rejeita vazio e valor começando com `-`, que o npm leria como flag)
 - `Version`: aceita versão exata (`5.0.0`), ranges (`^5`, `~1.2`, `>=2`), wildcards (`1.x`, `*`) e dist-tags (`latest`, `beta`). Vazio = `latest`.
 
 ### Tipos de aplicação (`domain/types.go`)
@@ -119,7 +119,7 @@ Estes tipos vivem no domínio porque são usados tanto pela UI (via `inbound`) q
 
 ### Erros de domínio (`domain/errors.go`)
 
-Sempre use erros tipados do domínio (`ErrEmptyDisplayName`, `ErrEmptyPackageName`, `ErrInvalidVersion`, `ErrPackageNotFound`, `ErrDuplicatePackage`, `ErrInstallFailed`, `ErrUninstallFailed`, `ErrNoPackageSelected`). Nunca retorne `errors.New(...)` avulso no domínio; adapters adicionam contexto com `fmt.Errorf("%w: ...", domain.ErrXxx)`.
+Sempre use erros tipados do domínio (`ErrEmptyDisplayName`, `ErrEmptyPackageName`, `ErrInvalidPackageName`, `ErrInvalidVersion`, `ErrPackageNotFound`, `ErrDuplicatePackage`, `ErrInstallFailed`, `ErrUninstallFailed`, `ErrNoPackageSelected`). Nunca retorne `errors.New(...)` avulso no domínio; adapters adicionam contexto com `fmt.Errorf("%w: ...", domain.ErrXxx)`.
 
 ---
 
@@ -204,9 +204,10 @@ Paleta definida:
 
 O app é aberto pelo Finder/menu do sistema e **não recebe o `PATH` do shell**. Por isso `newNpmCmd` resolve o npm por caminho absoluto e adiciona o diretório dele ao `PATH` do processo filho (o npm precisa achar o `node`).
 
-- Ordem de busca (`resolveNpm`): `PATH` do processo → Homebrew/sistema/n → Volta → asdf → fnm → nvm (alias `default`, depois a mais recente); no Windows: instalador oficial, Volta, nvm-windows, fnm, Scoop, Chocolatey
+- Ordem de busca (`resolveNpm`): `PATH` do processo → Homebrew/sistema/n → Volta → asdf → fnm → nvm (alias `default`, depois a maior versão); no Windows: instalador oficial, Volta, nvm-windows, fnm, Scoop, Chocolatey
+- Caminhos fixos (Homebrew/sistema) vêm antes dos gerenciadores de versão: com Node do Homebrew e do asdf, o app aberto pelo Finder usa o do Homebrew mesmo que o terminal use o asdf. O rodapé mostra qual está em uso
 - **asdf** (`asdf.go`): usa `ASDF_NODEJS_VERSION` ou o `~/.tool-versions` global e aponta direto para `installs/nodejs/<versão>/bin/npm` (os shims dependem do binário `asdf` no `PATH`); fallback para a maior versão executável. Após install/uninstall, roda `asdf reshim nodejs`
-- Todo candidato passa por `isExecutable`; caminhos comparados já normalizados (`absolutePath`); versões comparadas numericamente (`compareVersions`)
+- Todo candidato passa por `isExecutable`; nos gerenciadores com várias versões (asdf, fnm, nvm, nvm-windows) vale a maior versão executável, comparada numericamente (`globNewest`/`compareVersions`, ignorando o prefixo `v`); caminhos comparados já normalizados (`absolutePath`)
 - O alvo do npm é `Package.InstallTarget()` (`nome@versão`), montado a partir dos value objects
 
 ---
@@ -242,7 +243,7 @@ O app é aberto pelo Finder/menu do sistema e **não recebe o `PATH` do shell**.
 
 Resumo das regras; o detalhamento está em `.github/instructions/security.instructions.md`.
 
-- **npm:** nome e versão vindos da UI ou do CSV só chegam ao npm via `NewPackageName`/`NewVersion` → `InstallTarget()` (valor começando com `-` viraria flag do npm). Execução sempre com `exec.Cmd` (`Path` absoluto + `Args`), nunca pelo diretório corrente
+- **npm:** nome e versão vindos da UI ou do CSV só chegam ao npm via `NewPackageName`/`NewVersion` → `InstallTarget()`; `NewPackageName` rejeita valor começando com `-` (viraria flag do npm). Execução sempre com `exec.Cmd` (`Path` absoluto + `Args`), nunca pelo diretório corrente
 - **Ambiente do usuário:** o npm herda `os.Environ()` e lê o `~/.npmrc` (podem conter tokens) — nunca exibir na UI nem logar esse conteúdo; nunca desligar a verificação TLS do registry (`--strict-ssl=false`, `NODE_TLS_REJECT_UNAUTHORIZED=0`)
 - **SQL:** valores sempre como parâmetro `?`; partes dinâmicas da query só via whitelist (`sortColumn`) ou lista de placeholders
 - **CSV importado** é entrada externa: validar cada linha antes de gravar e manter o `ReplaceAll` transacional
@@ -256,6 +257,7 @@ Resumo das regras; o detalhamento está em `.github/instructions/security.instru
 ```bash
 go build ./...          # compila todos os pacotes
 go vet ./...            # análise estática
+go test -race ./...     # testes (domínio e installer)
 make                    # menu com todos os alvos (make help)
 make fmt                # go fmt ./...
 make lint               # golangci-lint (config em .golangci.yml: gosec, cyclop, gocognit, revive...)
@@ -267,11 +269,11 @@ make tidy               # go mod tidy
 make clean              # remove bin/ e dist/
 ```
 
-**Após qualquer alteração de código:** rode `go build ./...`, `go vet ./...`, `make fmt` e `make lint` — o CI (`ci.yml`) reprova código não formatado ou com achados do golangci-lint.
+**Após qualquer alteração de código:** rode `go build ./...`, `go vet ./...`, `go test -race ./...`, `make fmt` e `make lint` — o CI (`ci.yml`) reprova código não formatado ou com achados do golangci-lint (os testes ainda não rodam no CI).
 
 **Comandos que agentes não devem rodar para verificar:** `make run` abre a janela do app e não termina sozinho; `make run`, `make package` e `make package-macos` executam `clean` e apagam `bin/` e `dist/`. Use-os só quando o usuário pedir.
 
-**Testes:** o projeto ainda não tem suíte de testes. Ao adicionar, priorize lógica pura (domínio, resolução de versão/caminho do installer).
+**Testes:** ficam ao lado do código (`*_test.go`, mesmo pacote) e cobrem a lógica pura — value objects do domínio e resolução de versão/caminho do installer (com `t.TempDir` e `t.Setenv`, sem depender do Node da máquina). Mudança nessas áreas vem com teste que falharia sem ela; UI e adapters de I/O (SQLite, CSV, execução do npm) ainda não têm testes.
 
 ---
 
@@ -316,4 +318,4 @@ Lidas apenas pelo GitHub Copilot (code review e cloud agent); as regras essencia
 5. **Crie o adapter** implementando a interface outbound
 6. **Wire em `cmd/app/main.go`** — composition root é o único lugar com visão total
 7. **Propague `fyne.Do`** em qualquer mutação de UI vinda de goroutine
-8. **Valide com** `go build ./...`, `go vet ./...`, `make fmt` e `make lint` antes de encerrar
+8. **Valide com** `go build ./...`, `go vet ./...`, `go test -race ./...`, `make fmt` e `make lint` antes de encerrar

@@ -15,7 +15,7 @@ Permite instalar, desinstalar e gerenciar pacotes npm globais de forma centraliz
 | Funcionalidade | Descrição |
 | --- | --- |
 | 📦 Listagem | Exibe todos os pacotes cadastrados com status de instalação em tempo real |
-| ➕ Adicionar | Cadastra novo pacote com nome de exibição, nome npm e versão opcional |
+| ➕ Adicionar | Cadastra novo pacote com nome de exibição, nome npm (não pode começar com `-`) e versão opcional |
 | ✏️ Editar | Atualiza os dados de um pacote existente |
 | 🗑️ Remover | Remove o registro do banco de dados (não desinstala o pacote) |
 | ⬇️ Instalar | Executa `npm install -g` nos pacotes selecionados com progress dialog |
@@ -51,7 +51,10 @@ Aberto pelo Finder ou pelo menu do sistema, o app não herda o `PATH` do termina
 | Windows | `PATH` do processo → instalador oficial (`Program Files\nodejs`) → Volta → nvm-windows → fnm → Scoop → Chocolatey |
 
 - **asdf:** usa a versão global do `~/.tool-versions` (ou `ASDF_NODEJS_VERSION`); se ela não estiver instalada, usa a maior versão instalada. Após instalar/desinstalar, o app roda `asdf reshim nodejs` para os comandos aparecerem no terminal.
-- **nvm:** usa o alias `default`; sem ele, a versão instalada mais recente.
+- **nvm:** usa o alias `default` quando ele aponta para uma versão exata; caso contrário, a maior versão instalada.
+- **fnm, nvm-windows:** a maior versão instalada.
+- Nos gerenciadores de versão, "maior versão" é comparada numericamente (`v24.1.0` > `v9.11.2`) e só conta instalação com npm executável.
+- Node instalado pelo Homebrew ou pelo sistema tem prioridade sobre os gerenciadores de versão: se você tem os dois, o app usa o do Homebrew mesmo que o terminal use o asdf/nvm. As versões em uso aparecem no rodapé do app.
 
 > Com o Corepack habilitado (`corepack enable`), os atalhos `yarn`/`pnpm` não pertencem ao npm, e `npm install -g yarn` falha com `EEXIST`. Para instalar o Yarn pelo app, rode antes `corepack disable yarn`.
 
@@ -107,6 +110,9 @@ make run
 # 4. Ou compile o binário
 make build
 ./bin/packages-npm
+
+# 5. Rode os testes
+go test -race ./...
 ```
 
 ### Comandos disponíveis

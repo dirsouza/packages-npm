@@ -42,8 +42,9 @@ description: 'Idioma, deduplicação e contexto de risco do review — packages-
 - **Backup/restauração**: `ImportReplace` usa `ReplaceAll` transacional e cada linha do CSV
   vira `domain.Package` validado antes de qualquer INSERT. Quebrar a transação ou inserir sem
   validar é `blocking`; criar `Package` fora de `packageFromDTO` é duplicação a apontar.
-- O projeto ainda não tem suíte de testes: ausência de teste não é `blocking`, mas sugira
-  teste quando a mudança for lógica pura (domínio, resolução de versão/caminho).
+- Testes cobrem a lógica pura (value objects do domínio, resolução de versão/caminho do
+  installer): mudança nessas áreas sem teste que falharia sem ela é achado. UI e adapters de
+  I/O (SQLite, CSV, execução do npm) ainda não têm testes — ali a ausência não é `blocking`.
 - Seja específico: diga qual camada/pacote (`core/domain`, `core/usecases`,
   `adapters/installer`, `adapters/persistence`, `adapters/backup`, `ui/window`, `cmd/app`)
   e qual regra ou contrato é afetado.
