@@ -15,17 +15,17 @@ Permite instalar, desinstalar e gerenciar pacotes npm globais de forma centraliz
 | Funcionalidade | Descrição |
 | --- | --- |
 | 📦 Listagem | Exibe todos os pacotes cadastrados com status de instalação em tempo real |
-| ➕ Adicionar | Cadastra novo pacote com nome de exibição, nome npm (não pode começar com `-`) e versão opcional |
+| ➕ Adicionar | Cadastra novo pacote com nome de exibição, nome npm (segue as regras de nome do npm, ex.: `typescript`, `@nestjs/cli`) e versão opcional |
 | ✏️ Editar | Atualiza os dados de um pacote existente |
 | 🗑️ Remover | Remove o registro do banco de dados (não desinstala o pacote) |
-| ⬇️ Instalar | Executa `npm install -g` nos pacotes selecionados com progress dialog |
+| ⬇️ Instalar | Executa `npm install -g` nos pacotes selecionados com progress dialog; em caso de falha, mostra o motivo informado pelo npm |
 | 🚫 Desinstalar | Executa `npm uninstall -g` nos pacotes instalados selecionados |
-| ✅ Status | Detecta automaticamente se cada pacote está instalado, com versão incorreta ou ausente |
+| ✅ Status | Detecta automaticamente se cada pacote está instalado, com versão diferente da fixada ou ausente |
 | 🟢 Node.js | Exibe no rodapé as versões do Node.js e do npm usados pelo app |
 | ☑️ Seleção em massa | Selecionar todos / Desmarcar todos com um clique |
 | 🔀 Ordenação | Ordena a lista por ID (ordem de inserção, padrão) ou por Nome |
 | 💾 Backup | Exporta todos os pacotes para arquivo `.csv` |
-| 📥 Restaurar | Importa de `.csv` em modo Mesclar (preserva existentes) ou Substituir tudo |
+| 📥 Restaurar | Importa de `.csv` em modo Mesclar (preserva existentes e informa quantos foram ignorados) ou Substituir tudo |
 
 ---
 
@@ -166,7 +166,9 @@ id,display_name,package_name,version
 2. Selecione o arquivo `.csv`
 3. Escolha o modo:
    - **Substituir tudo** — apaga os registros atuais e restaura com os IDs originais
-   - **Mesclar** — mantém os existentes, adiciona apenas os ausentes
+   - **Mesclar** — mantém os existentes, adiciona apenas os ausentes e informa quantas linhas foram ignoradas (já cadastradas ou inválidas)
+
+O arquivo precisa ter o cabeçalho `id,display_name,package_name,version` na primeira linha (arquivos salvos pelo Excel com BOM são aceitos). Arquivo sem cabeçalho ou com colunas em outra ordem é recusado.
 
 ---
 
@@ -183,6 +185,8 @@ O campo "Versão" aceita os seguintes formatos:
 | Comparadores | `>=2.0.0`, `<3` | Instala versão que satisfaz |
 | Wildcard | `1.x`, `*` | Qualquer versão no major |
 | Dist-tag | `latest`, `next`, `beta` | Tag npm |
+
+Só a versão exata é comparada com a instalada: com range, wildcard ou dist-tag, qualquer versão instalada aparece como "instalado".
 
 ---
 

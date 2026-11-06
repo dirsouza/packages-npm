@@ -17,7 +17,7 @@ Este arquivo orienta assistentes de IA sobre as convenções, regras arquitetura
 
 ## Preparação do ambiente
 
-- **Go** na versão do `go.mod` e **Node.js/npm** (necessário em runtime para instalar e verificar pacotes)
+- **Go** na versão do `go.mod` (a diretiva `toolchain` fixa o patch usado no build e no CI) e **Node.js/npm** (necessário em runtime para instalar e verificar pacotes)
 - **Compilador C e libs gráficas** (o Fyne usa CGo e OpenGL/Metal):
   - macOS: `xcode-select --install`
   - Linux: `sudo apt-get install gcc libgl1-mesa-dev xorg-dev libwayland-dev libxkbcommon-dev`
@@ -94,7 +94,7 @@ ui/
 type Package struct {
     ID          int64
     DisplayName string      // obrigatório, validado por Validate()
-    Name        PackageName // value object — não vazio, não começa com "-"
+    Name        PackageName // value object — segue as regras de nome do npm
     Version     Version     // value object — semver, range, dist-tag ou vazio
     CreatedAt   time.Time
     UpdatedAt   time.Time
@@ -105,8 +105,9 @@ type Package struct {
 
 ### Value Objects
 
-- `PackageName`: imutável, criado por `NewPackageName(raw string)` (faz trim; rejeita vazio e valor começando com `-`, que o npm leria como flag)
-- `Version`: aceita versão exata (`5.0.0`), ranges (`^5`, `~1.2`, `>=2`), wildcards (`1.x`, `*`) e dist-tags (`latest`, `beta`). Vazio = `latest`.
+- `PackageName`: imutável, criado por `NewPackageName(raw string)`. Faz trim e aceita só nomes válidos no npm — letras, dígitos, `-`, `.`, `_`, `~`, escopo `@x/` opcional, até 214 caracteres, sem começar com `-`. Isso barra flags, URLs, caminhos e metacaracteres de shell (o `npm.cmd` do Windows passa pelo `cmd.exe`)
+- `Version`: aceita versão exata (`5.0.0`), ranges (`^5`, `~1.2`, `>=2`), wildcards (`1.x`, `*`) e dist-tags (`latest`, `beta`). Vazio = `latest`. `IsExact()` diz se fixa uma única versão — só versão exata pode ficar "diferente da instalada"
+- `Package.Validate()` rejeita nome de exibição vazio ou só com espaços
 
 ### Tipos de aplicação (`domain/types.go`)
 
@@ -133,7 +134,7 @@ Sempre use erros tipados do domínio (`ErrEmptyDisplayName`, `ErrEmptyPackageNam
 
 | Interface | Responsabilidade |
 | --- | --- |
-| `PackageRepository` | CRUD + ReplaceAll + Restore |
+| `PackageRepository` | CRUD + ReplaceAll |
 | `PackageInstaller` | Install / Uninstall via npm |
 | `PackageChecker` | ListGlobalInstalled via `npm list`; CheckRuntime (versões do Node.js e npm) via `npm version` |
 | `BackupStorage` | Write / Read de arquivo de backup |
@@ -149,6 +150,8 @@ Sempre use erros tipados do domínio (`ErrEmptyDisplayName`, `ErrEmptyPackageNam
 - Recebe todas as dependências por **injeção no construtor** (`NewPackageService`)
 - Nunca acessa banco, npm ou sistema de arquivos diretamente
 - Função `packageFromDTO(dto)` centraliza criação de `Package` a partir de DTO — **não duplique essa lógica**
+- `InstallSelected` e `UninstallSelected` compartilham `runOnSelected` (validação dos IDs, busca e progresso); só mudam o argumento do npm e a operação
+- `ImportBackup` devolve `inbound.ImportResult` (`Imported`, `Skipped`): no modo Mesclar, entradas já cadastradas ou inválidas são contadas como ignoradas, nunca descartadas em silêncio
 
 ---
 
@@ -209,6 +212,7 @@ O app é aberto pelo Finder/menu do sistema e **não recebe o `PATH` do shell**.
 - **asdf** (`asdf.go`): usa `ASDF_NODEJS_VERSION` ou o `~/.tool-versions` global e aponta direto para `installs/nodejs/<versão>/bin/npm` (os shims dependem do binário `asdf` no `PATH`); fallback para a maior versão executável. Após install/uninstall, roda `asdf reshim nodejs`
 - Todo candidato passa por `isExecutable`; nos gerenciadores com várias versões (asdf, fnm, nvm, nvm-windows) vale a maior versão executável, comparada numericamente (`globNewest`/`compareVersions`, ignorando o prefixo `v`); caminhos comparados já normalizados (`absolutePath`)
 - O alvo do npm é `Package.InstallTarget()` (`nome@versão`), montado a partir dos value objects
+- Falha de install/uninstall volta como `domain.ErrInstallFailed`/`ErrUninstallFailed` com as primeiras linhas `npm error` da saída (`npmErrorSummary`); a UI mostra esse motivo, não só o nome do pacote
 
 ---
 
@@ -218,6 +222,7 @@ O app é aberto pelo Finder/menu do sistema e **não recebe o `PATH` do shell**.
 - Conexão gerenciada em `infrastructure/database/Connection`; o composition root (`main.go`) controla o lifecycle com `defer conn.Close()`
 - Migrations via `ALTER TABLE ADD COLUMN` com tratamento de "duplicate column name" (idempotente)
 - Timestamps: `created_at` e `updated_at` preenchidos em `Save` e `Update`; `FindAll` ordena por `domain.SortOrder`
+- `FindAll`/`FindByIDs` ignoram (com log) registros que não passam mais na validação do domínio — um dado legado nunca pode impedir o app de abrir
 
 ---
 
@@ -231,10 +236,10 @@ O app é aberto pelo Finder/menu do sistema e **não recebe o `PATH` do shell**.
 
 ## Backup / Restauração
 
-- Formato: **CSV** com cabeçalho `id,display_name,package_name,version`
+- Formato: **CSV** com cabeçalho `id,display_name,package_name,version` — a leitura exige esse cabeçalho (aceita o BOM do Excel) e rejeita arquivo sem cabeçalho ou com colunas em outra ordem
 - Adapter: `CSVBackupStorage` em `internal/adapters/backup/`
 - `ImportReplace`: `ReplaceAll()` transacional (BEGIN → DELETE → INSERT → COMMIT/ROLLBACK)
-- `ImportMerge`: adiciona apenas os ausentes por `package_name`
+- `ImportMerge`: adiciona apenas os ausentes por `package_name` e informa quantos foram ignorados
 - Cada entrada é validada como `domain.Package` antes de qualquer INSERT
 
 ---
@@ -243,11 +248,12 @@ O app é aberto pelo Finder/menu do sistema e **não recebe o `PATH` do shell**.
 
 Resumo das regras; o detalhamento está em `.github/instructions/security.instructions.md`.
 
-- **npm:** nome e versão vindos da UI ou do CSV só chegam ao npm via `NewPackageName`/`NewVersion` → `InstallTarget()`; `NewPackageName` rejeita valor começando com `-` (viraria flag do npm). Execução sempre com `exec.Cmd` (`Path` absoluto + `Args`), nunca pelo diretório corrente
+- **npm:** nome e versão vindos da UI ou do CSV só chegam ao npm via `NewPackageName`/`NewVersion` → `InstallTarget()`. As regras de nome do npm e o regex de versão são a defesa contra flag injection e contra injeção de comando no Windows (`npm.cmd` é executado pelo `cmd.exe`, que interpreta `&`, `|`, `%`); não afrouxe essas validações. Execução sempre com `exec.Cmd` (`Path` absoluto + `Args`), nunca pelo diretório corrente
 - **Ambiente do usuário:** o npm herda `os.Environ()` e lê o `~/.npmrc` (podem conter tokens) — nunca exibir na UI nem logar esse conteúdo; nunca desligar a verificação TLS do registry (`--strict-ssl=false`, `NODE_TLS_REJECT_UNAUTHORIZED=0`)
 - **SQL:** valores sempre como parâmetro `?`; partes dinâmicas da query só via whitelist (`sortColumn`) ou lista de placeholders
 - **CSV importado** é entrada externa: validar cada linha antes de gravar e manter o `ReplaceAll` transacional
 - **Empacotamento:** o `.pkg` instala só no domínio do usuário, sem scripts de pré/pós-instalação
+- **Dependências:** `govulncheck` roda no CI e não pode acusar vulnerabilidade alcançável; corrija atualizando o módulo ou o patch do `toolchain`
 - **CI:** não ampliar `permissions` dos workflows; actions de terceiros fixadas por SHA (com a tag em comentário) e ferramentas com versão fixa (`fyne` v1.7.4, `golangci-lint` v2.15.0); dependência ou action nova exige justificativa na PR
 
 ---
@@ -257,7 +263,8 @@ Resumo das regras; o detalhamento está em `.github/instructions/security.instru
 ```bash
 go build ./...          # compila todos os pacotes
 go vet ./...            # análise estática
-go test -race ./...     # testes (domínio e installer)
+go test -race ./...     # testes
+go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...   # vulnerabilidades alcançáveis
 make                    # menu com todos os alvos (make help)
 make fmt                # go fmt ./...
 make lint               # golangci-lint (config em .golangci.yml: gosec, cyclop, gocognit, revive...)
@@ -273,7 +280,16 @@ make clean              # remove bin/ e dist/
 
 **Comandos que agentes não devem rodar para verificar:** `make run` abre a janela do app e não termina sozinho; `make run`, `make package` e `make package-macos` executam `clean` e apagam `bin/` e `dist/`. Use-os só quando o usuário pedir.
 
-**Testes:** ficam ao lado do código (`*_test.go`, mesmo pacote) e cobrem a lógica pura — value objects do domínio e resolução de versão/caminho do installer (com `t.TempDir` e `t.Setenv`, sem depender do Node da máquina). Mudança nessas áreas vem com teste que falharia sem ela; UI e adapters de I/O (SQLite, CSV, execução do npm) ainda não têm testes.
+**Testes:** ficam ao lado do código (`*_test.go`, mesmo pacote), em tabela, e não dependem do Node da máquina:
+
+- domínio: value objects e `Validate()`
+- use cases: fakes à mão das portas outbound (struct que embute a interface e implementa só o que o teste usa)
+- installer: resolução de versão/caminho com `t.TempDir` e `t.Setenv`; leitura da saída do npm
+- persistência: SQLite real em memória (`database.Open(":memory:")`)
+- backup: arquivo CSV em `t.TempDir`
+- viewmodel: regras de apresentação
+
+Mudança de comportamento vem com teste que falharia sem ela. A UI (`ui/window`, `ui/components`) e a execução real do npm ficam fora dos testes automatizados.
 
 ---
 
@@ -309,6 +325,69 @@ Lidas apenas pelo GitHub Copilot (code review e cloud agent); as regras essencia
 
 ---
 
+## Boas práticas de código
+
+Princípios valem pela consequência que evitam neste código — não por si. Quando dois puxarem para lados opostos (ex.: DRY pede abstração, YAGNI pede esperar), escolha o mais simples que resolve o problema de hoje e registre o motivo na PR.
+
+### Código Limpo
+
+- Nomes que dizem o que a coisa é no domínio (`InstallTarget`, `ImportResult`, `npmErrorSummary`), sem abreviações nem prefixos de tipo; siglas em caixa uniforme (`ID`, `URL`)
+- Funções curtas, com um nível de abstração e retorno antecipado para erros — o caminho feliz sem indentação; `cyclop` e `gocognit` no `.golangci.yml` limitam a complexidade
+- Constantes nomeadas no lugar de números e textos mágicos (`maxPackageNameLength`, `maxErrorLines`, `utf8BOM`)
+- Erros nunca engolidos: propague com contexto (`fmt.Errorf("...: %w", err)`) ou, quando ignorar for a decisão certa, registre em log e explique o motivo no nome ou no doc da função
+- Código sem uso é removido, não comentado
+
+### Comentários
+
+- Comente o **porquê**, nunca o **o quê**: decisão não óbvia, restrição externa (ex.: "o shim do asdf depende do binário no `PATH`"), armadilha de plataforma
+- Identificador exportado tem doc comment começando pelo próprio nome (`revive`/`godot` cobram); helper privado autoexplicativo não precisa de comentário
+- Não repita em comentário o que o nome ou o tipo já dizem, não narre o código linha a linha e não deixe comentário desatualizado — comentário que mente é bug
+- Nada de `TODO` sem contexto nem código comentado
+
+### Refatoração
+
+- Refatore em passos pequenos, com os testes verdes antes e depois; refatoração não muda comportamento — se mudar, é outro commit (`fix`/`feat`)
+- Regra do escoteiro: ao mexer num trecho, deixe-o um pouco melhor (nome, duplicação, função longa), sem reescrever o que não faz parte da tarefa
+- Antes de refatorar código sem teste, escreva o teste que fixa o comportamento atual
+
+### SOLID
+
+- **S** — cada tipo tem um motivo para mudar: o use case orquestra, o adapter traduz tecnologia, o ViewModel formata, o presenter (`MainWindow`) liga UI e use case
+- **O** — nova tecnologia entra como novo adapter de uma porta existente, sem alterar o core
+- **L** — toda implementação de porta respeita o contrato documentado na interface (ex.: `ReplaceAll` é atômico em qualquer adapter)
+- **I** — portas pequenas e focadas (`PackageInstaller`, `PackageChecker`, `BackupStorage`); não adicione métodos que só um consumidor hipotético usaria
+- **D** — o core depende de interfaces declaradas em `ports/`; implementações concretas só aparecem no composition root (`cmd/app`)
+
+### Design Patterns
+
+Use o padrão que o projeto já adota antes de introduzir outro:
+
+- **Ports & Adapters** para toda integração externa (npm, SQLite, CSV)
+- **Repository** para persistência (`PackageRepository`)
+- **Value Object** para regras de formato (`PackageName`, `Version`) — validação no construtor, valor imutável
+- **Factory/Constructor** `NewX` com injeção de dependências
+- **ViewModel + Presenter** na UI (`PackageVM`, `MainWindow`)
+- **Composition Root** em `cmd/app/main.go`
+
+Padrão novo só com problema concreto que os atuais não resolvem.
+
+### DRY
+
+- Uma regra de negócio tem um único lugar: validação em value objects e `Validate()`, criação de `Package` em `packageFromDTO`, laço de instalar/desinstalar em `runOnSelected`, execução do npm em `runGlobal`
+- Duplicação de conhecimento é bug; duplicação acidental de duas linhas parecidas pode ficar — abstraia na terceira ocorrência ou quando as cópias precisarem mudar juntas
+
+### KISS
+
+- Prefira stdlib e código explícito a dependências, reflexão ou genéricos sem necessidade
+- A solução mais simples que atende ao caso de hoje: struct com campos claros em vez de mapas genéricos, `switch`/`if` legível em vez de indireção
+
+### YAGNI
+
+- Não crie método de porta, parâmetro, flag ou camada "para o futuro": `Restore` e `DeleteAll` foram removidos do `PackageRepository` por falta de uso
+- Dependência nova só com uso real e justificativa na PR
+
+---
+
 ## O que fazer ao receber uma tarefa
 
 1. **Leia** os arquivos relevantes antes de editar
@@ -318,4 +397,5 @@ Lidas apenas pelo GitHub Copilot (code review e cloud agent); as regras essencia
 5. **Crie o adapter** implementando a interface outbound
 6. **Wire em `cmd/app/main.go`** — composition root é o único lugar com visão total
 7. **Propague `fyne.Do`** em qualquer mutação de UI vinda de goroutine
-8. **Valide com** `go build ./...`, `go vet ./...`, `go test -race ./...`, `make fmt` e `make lint` antes de encerrar
+8. **Escreva ou ajuste o teste** que falharia sem a mudança e aplique as boas práticas acima no código que tocar
+9. **Valide com** `go build ./...`, `go vet ./...`, `go test -race ./...`, `make fmt` e `make lint` antes de encerrar

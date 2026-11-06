@@ -9,7 +9,9 @@ description: 'Segurança — app desktop Go + Fyne (execução do npm, SQLite, b
 
 - O alvo do npm vem de `domain.Package.InstallTarget()` (`nome@versão`), montado só a partir de
   `PackageName`/`Version` já validados. Valor vindo da UI ou do CSV nunca chega ao npm sem
-  passar por `NewPackageName`/`NewVersion`; valor começando com `-` seria lido como flag do npm.
+  passar por `NewPackageName`/`NewVersion`. O nome segue as regras do npm (sem `-` inicial,
+  URL, caminho ou metacaractere): no Windows o `npm.cmd` roda pelo `cmd.exe`, que interpreta
+  `&`, `|` e `%` mesmo com `exec.Cmd`, então afrouxar essas validações abre injeção de comando.
 - O npm é executado via `exec.Cmd` com `Path` absoluto e `Args` separados. Binários
   (npm, node, asdf) são escolhidos por caminho absoluto e limpo (`absolutePath`) e checados com
   `isExecutable`; a busca usa o `PATH` do processo e, depois, locais fixos de instalação e

@@ -34,7 +34,7 @@ description: 'Idioma, deduplicação e contexto de risco do review — packages-
   checar `isExecutable` antes de escolher um candidato, comparar versões numericamente
   (24.14 > 24.9) e comparar caminhos já normalizados (absolutos e limpos). O npm é executado
   via `exec.Cmd` com `Args`; nome e versão vindos da UI ou do CSV só chegam ao npm depois de
-  `NewPackageName`/`NewVersion` (ex.: valor começando com `-` viraria flag do npm).
+  `NewPackageName`/`NewVersion`, que barram flags, URLs e metacaracteres do `cmd.exe` (Windows).
 - **Cross-platform**: o código roda em macOS, Linux e Windows. Aponte caminhos montados com
   `/` fixo em vez de `filepath`, `:` em vez de `os.PathListSeparator` e ausência do `npm.cmd`
   no Windows. Builds de Linux/Windows saem do CI (`release.yml`); o `.pkg` do macOS é gerado
@@ -42,9 +42,10 @@ description: 'Idioma, deduplicação e contexto de risco do review — packages-
 - **Backup/restauração**: `ImportReplace` usa `ReplaceAll` transacional e cada linha do CSV
   vira `domain.Package` validado antes de qualquer INSERT. Quebrar a transação ou inserir sem
   validar é `blocking`; criar `Package` fora de `packageFromDTO` é duplicação a apontar.
-- Testes cobrem a lógica pura (value objects do domínio, resolução de versão/caminho do
-  installer): mudança nessas áreas sem teste que falharia sem ela é achado. UI e adapters de
-  I/O (SQLite, CSV, execução do npm) ainda não têm testes — ali a ausência não é `blocking`.
+- Domínio, use cases, installer, persistência (SQLite em memória), backup e viewmodel têm
+  testes: mudança de comportamento nessas áreas sem teste que falharia sem ela é achado. A UI
+  (`ui/window`, `ui/components`) e a execução real do npm ficam fora — ali a ausência não é
+  `blocking`.
 - Seja específico: diga qual camada/pacote (`core/domain`, `core/usecases`,
   `adapters/installer`, `adapters/persistence`, `adapters/backup`, `ui/window`, `cmd/app`)
   e qual regra ou contrato é afetado.
