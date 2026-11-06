@@ -1,13 +1,13 @@
 package backup
 
 import (
+	"bufio"
 	"encoding/csv"
 	"errors"
 	"fmt"
 	"os"
 	"slices"
 	"strconv"
-	"strings"
 
 	"github.com/dirsouza/packages-npm/internal/core/ports/outbound"
 )
@@ -69,7 +69,7 @@ func (c *CSVBackupStorage) Read(path string) ([]outbound.BackupEntry, error) {
 	}
 	defer f.Close()
 
-	r := csv.NewReader(f)
+	r := csv.NewReader(skipBOM(bufio.NewReader(f)))
 	r.TrimLeadingSpace = true
 
 	rows, err := r.ReadAll()
@@ -103,14 +103,19 @@ func (c *CSVBackupStorage) Read(path string) ([]outbound.BackupEntry, error) {
 	return entries, nil
 }
 
+// skipBOM drops the UTF-8 BOM that Excel writes before the first field; left in
+// the stream, it breaks the parsing of a quoted header.
+func skipBOM(r *bufio.Reader) *bufio.Reader {
+	if prefix, err := r.Peek(len(utf8BOM)); err == nil && string(prefix) == utf8BOM {
+		_, _ = r.Discard(len(utf8BOM))
+	}
+	return r
+}
+
 // checkHeader rejects files whose columns do not match csvHeader, so a file
 // without header or with reordered columns is not imported with shifted data.
 func checkHeader(header []string) error {
-	got := slices.Clone(header)
-	if len(got) > 0 {
-		got[0] = strings.TrimPrefix(got[0], utf8BOM)
-	}
-	if !slices.Equal(got, csvHeader) {
+	if !slices.Equal(header, csvHeader) {
 		return fmt.Errorf("backup: cabeçalho inválido %v (esperado %v)", header, csvHeader)
 	}
 	return nil

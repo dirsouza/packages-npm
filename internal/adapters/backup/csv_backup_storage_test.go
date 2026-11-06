@@ -41,13 +41,17 @@ func TestCSVBackupStorageRoundTrip(t *testing.T) {
 func TestCSVBackupStorageReadHeader(t *testing.T) {
 	storage := NewCSVBackupStorage()
 
-	t.Run("aceita BOM do Excel", func(t *testing.T) {
-		path := writeFile(t, utf8BOM+"id,display_name,package_name,version\n1,TypeScript,typescript,\n")
-		got, err := storage.Read(path)
-		if err != nil || len(got) != 1 || got[0].PackageName != "typescript" {
-			t.Fatalf("got %+v, %v", got, err)
-		}
-	})
+	for name, content := range map[string]string{
+		"BOM do Excel":                  utf8BOM + "id,display_name,package_name,version\n1,TypeScript,typescript,\n",
+		"BOM com cabeçalho entre aspas": utf8BOM + `"id","display_name","package_name","version"` + "\n" + `1,"TypeScript","typescript",""` + "\n",
+	} {
+		t.Run("aceita "+name, func(t *testing.T) {
+			got, err := storage.Read(writeFile(t, content))
+			if err != nil || len(got) != 1 || got[0].PackageName != "typescript" {
+				t.Fatalf("got %+v, %v", got, err)
+			}
+		})
+	}
 
 	for name, content := range map[string]string{
 		"sem cabeçalho":       "1,TypeScript,typescript,\n",

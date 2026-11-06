@@ -236,7 +236,7 @@ O app é aberto pelo Finder/menu do sistema e **não recebe o `PATH` do shell**.
 
 ## Backup / Restauração
 
-- Formato: **CSV** com cabeçalho `id,display_name,package_name,version` — a leitura exige esse cabeçalho (aceita o BOM do Excel) e rejeita arquivo sem cabeçalho ou com colunas em outra ordem
+- Formato: **CSV** com cabeçalho `id,display_name,package_name,version` — a leitura exige esse cabeçalho (o BOM do Excel é removido do stream antes do parser CSV, senão um cabeçalho entre aspas falha) e rejeita arquivo sem cabeçalho ou com colunas em outra ordem
 - Adapter: `CSVBackupStorage` em `internal/adapters/backup/`
 - `ImportReplace`: `ReplaceAll()` transacional (BEGIN → DELETE → INSERT → COMMIT/ROLLBACK)
 - `ImportMerge`: adiciona apenas os ausentes por `package_name` e informa quantos foram ignorados; erro que não seja de validação/duplicidade interrompe a importação e devolve o resultado parcial
@@ -398,4 +398,5 @@ Padrão novo só com problema concreto que os atuais não resolvem.
 6. **Wire em `cmd/app/main.go`** — composition root é o único lugar com visão total
 7. **Propague `fyne.Do`** em qualquer mutação de UI vinda de goroutine
 8. **Escreva ou ajuste o teste** que falharia sem a mudança e aplique as boas práticas acima no código que tocar
-9. **Valide com** `go build ./...`, `go vet ./...`, `go test -race ./...`, `make fmt`, `make lint` e `go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...` antes de encerrar
+9. **Revise a documentação** — `AGENTS.md`, `README.md` e `.github/instructions/*.md`: se a mudança alterar comportamento, contrato, comando, versão ou regra descrita neles, atualize no mesmo PR; documentação que contradiz o código é bug
+10. **Valide com** `go build ./...`, `go vet ./...`, `go test -race ./...`, `make fmt`, `make lint` e `go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...` antes de encerrar
