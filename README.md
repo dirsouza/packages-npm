@@ -57,7 +57,7 @@ Aberto pelo Finder ou pelo menu do sistema, o app não herda o `PATH` do termina
 - Nos gerenciadores de versão, "maior versão" é comparada numericamente (`v24.1.0` > `v9.11.2`) e só conta instalação com npm executável.
 - Node instalado pelo Homebrew ou pelo sistema tem prioridade sobre os gerenciadores de versão: se você tem os dois, o app usa o do Homebrew mesmo que o terminal use o asdf/nvm. As versões em uso aparecem no rodapé do app.
 
-> Com o Corepack habilitado (`corepack enable`), os atalhos `yarn`/`pnpm` não pertencem ao npm, e `npm install -g yarn` falha com `EEXIST`. Para instalar o Yarn pelo app, rode antes `corepack disable yarn`.
+> Com o Corepack habilitado (`corepack enable`), os atalhos `yarn`/`pnpm` não pertencem ao npm, e `npm install -g yarn` falha com `EEXIST`. Nesse caso, a mensagem de erro do app já indica o comando a rodar — `corepack disable yarn` ou `corepack disable pnpm` — antes de instalar de novo.
 
 ---
 

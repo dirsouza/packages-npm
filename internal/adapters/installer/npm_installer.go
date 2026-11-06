@@ -33,19 +33,38 @@ func runGlobal(failure error, command, arg string) error {
 		return fmt.Errorf("%w: %s — %w", failure, arg, err)
 	}
 	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("%w: %s — %s", failure, arg, npmErrorSummary(output))
+		return fmt.Errorf("%w: %s — %s", failure, arg, npmFailureDetail(output))
 	}
 	reshimAsdf(cmd.Path)
 	return nil
 }
 
-// npmErrorSummary keeps the first "npm error" lines, which carry the cause of
+func npmFailureDetail(output []byte) string {
+	detail := npmErrorSummary(output)
+	if hint := corepackHint(output); hint != "" {
+		detail += "\n\n" + hint
+	}
+	return detail
+}
+
+// cutNpmErrorPrefix strips the error prefix of an npm log line: "npm error"
+// in current npm, "npm ERR!" in older releases.
+func cutNpmErrorPrefix(line string) (string, bool) {
+	for _, prefix := range [...]string{"npm error", "npm ERR!"} {
+		if rest, ok := strings.CutPrefix(line, prefix); ok {
+			return strings.TrimSpace(rest), true
+		}
+	}
+	return "", false
+}
+
+// npmErrorSummary keeps the first npm error lines, which carry the cause of
 // the failure, instead of the whole npm log.
 func npmErrorSummary(output []byte) string {
 	var lines []string
 	for line := range strings.Lines(string(output)) {
-		if cause, ok := strings.CutPrefix(line, "npm error"); ok {
-			lines = append(lines, strings.TrimSpace(cause))
+		if cause, ok := cutNpmErrorPrefix(line); ok {
+			lines = append(lines, cause)
 			if len(lines) == maxErrorLines {
 				break
 			}

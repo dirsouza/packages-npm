@@ -213,7 +213,8 @@ O app é aberto pelo Finder/menu do sistema e **não recebe o `PATH` do shell**.
 - **asdf** (`asdf.go`): usa `ASDF_NODEJS_VERSION` ou o `~/.tool-versions` global e aponta direto para `installs/nodejs/<versão>/bin/npm` (os shims dependem do binário `asdf` no `PATH`); fallback para a maior versão executável. Após install/uninstall, roda `asdf reshim nodejs`
 - Todo candidato passa por `isExecutable`; nos gerenciadores com várias versões (asdf, fnm, nvm, nvm-windows) vale a maior versão executável, comparada numericamente (`globNewest`/`compareVersions`, ignorando o prefixo `v`); caminhos comparados já normalizados (`absolutePath`)
 - O alvo do npm é `Package.InstallTarget()` (`nome@versão`), montado a partir dos value objects
-- Falha de install/uninstall volta como `domain.ErrInstallFailed`/`ErrUninstallFailed` com as primeiras linhas `npm error` da saída (`npmErrorSummary`); a UI mostra esse motivo, não só o nome do pacote
+- Falha de install/uninstall volta como `domain.ErrInstallFailed`/`ErrUninstallFailed` com as primeiras linhas de erro da saída — `npm error` no npm atual, `npm ERR!` no antigo, reconhecidos só por `cutNpmErrorPrefix` (`npmErrorSummary`); a UI mostra esse motivo, não só o nome do pacote
+- `EEXIST` num atalho do Corepack (`yarn`/`yarnpkg` → `yarn`, `pnpm`/`pnpx` → `pnpm`) ganha a dica `corepack disable <gerenciador>` (`corepackHint`, em `corepack.go`). O atalho é confirmado pelo próprio arquivo — symlink para `corepack/` no Unix, script que cita o Corepack no Windows —, nunca só pelo nome
 
 ---
 
