@@ -254,7 +254,7 @@ Resumo das regras; o detalhamento está em `.github/instructions/security.instru
 - **CSV importado** é entrada externa: validar cada linha antes de gravar e manter o `ReplaceAll` transacional
 - **Empacotamento:** o `.pkg` instala só no domínio do usuário, sem scripts de pré/pós-instalação
 - **Dependências:** `govulncheck` roda no CI e não pode acusar vulnerabilidade alcançável; corrija atualizando o módulo ou o patch do `toolchain`
-- **CI:** não ampliar `permissions` dos workflows; actions de terceiros fixadas por SHA (com a tag em comentário) e ferramentas com versão fixa (`fyne` v1.7.4, `golangci-lint` v2.15.0); dependência ou action nova exige justificativa na PR
+- **CI:** não ampliar `permissions` dos workflows; actions referenciadas pela tag de major (`@v7`), sem SHA, e ferramentas com versão fixa (`fyne` v1.7.4, `golangci-lint` v2.15.0); dependência ou action nova exige justificativa na PR
 
 ---
 
