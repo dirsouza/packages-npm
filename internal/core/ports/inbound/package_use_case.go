@@ -21,6 +21,12 @@ type InstalledInfo struct {
 	IsInstalled      bool
 }
 
+// RuntimeInfo carries the versions of the Node.js runtime and npm found on the machine.
+type RuntimeInfo struct {
+	NodeVersion string
+	NpmVersion  string
+}
+
 // PackageUseCase is the inbound port — the contract the UI depends on.
 // Each method maps to a distinct use case (SRP + ISP).
 type PackageUseCase interface {
@@ -38,6 +44,9 @@ type PackageUseCase interface {
 	// CheckInstalled returns installation info for all known packages.
 	// It does NOT block on failure — an error is returned instead of panicking.
 	CheckInstalled() (map[string]InstalledInfo, error)
+
+	// CheckRuntime returns the Node.js and npm versions used to manage packages.
+	CheckRuntime() (RuntimeInfo, error)
 
 	// ExportBackup serializa todos os pacotes para um arquivo CSV no caminho indicado.
 	ExportBackup(path string) error

@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"errors"
 	"regexp"
 	"strings"
 )
@@ -17,7 +16,7 @@ type PackageName struct {
 func NewPackageName(raw string) (PackageName, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
-		return PackageName{}, errors.New("package name cannot be empty")
+		return PackageName{}, ErrEmptyPackageName
 	}
 	return PackageName{value: trimmed}, nil
 }
@@ -38,7 +37,7 @@ func NewVersion(raw string) (Version, error) {
 		return Version{}, nil
 	}
 	if !versionRegex.MatchString(trimmed) {
-		return Version{}, errors.New("invalid version format: use a semver, range, wildcard, dist-tag or leave it empty")
+		return Version{}, ErrInvalidVersion
 	}
 	return Version{value: trimmed}, nil
 }

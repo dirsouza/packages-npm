@@ -25,6 +25,7 @@ func (n *NpmInstaller) Install(pkgTarget string) error {
 	if err != nil {
 		return fmt.Errorf("%w: %s — %s", domain.ErrInstallFailed, pkgTarget, string(output))
 	}
+	reshimAsdf(cmd.Path)
 	return nil
 }
 
@@ -39,5 +40,6 @@ func (n *NpmInstaller) Uninstall(pkgName string) error {
 	if err != nil {
 		return fmt.Errorf("%w: %s — %s", domain.ErrUninstallFailed, pkgName, string(output))
 	}
+	reshimAsdf(cmd.Path)
 	return nil
 }

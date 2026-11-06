@@ -16,6 +16,12 @@ type npmDep struct {
 	Version string `json:"version"`
 }
 
+// npmVersionOutput mirrors the fields used from `npm version --json`.
+type npmVersionOutput struct {
+	Npm  string `json:"npm"`
+	Node string `json:"node"`
+}
+
 // NpmPackageChecker implements outbound.PackageChecker using the system npm CLI.
 type NpmPackageChecker struct{}
 
@@ -61,4 +67,27 @@ func (c *NpmPackageChecker) ListGlobalInstalled() (map[string]outbound.Installed
 		installed[name] = outbound.InstalledPackage{Name: name, Version: dep.Version}
 	}
 	return installed, nil
+}
+
+// CheckRuntime runs `npm version --json` and returns the Node.js and npm versions.
+// Using npm (instead of calling node directly) reports the same runtime that
+// installs and lists the packages.
+func (c *NpmPackageChecker) CheckRuntime() (outbound.RuntimeVersions, error) {
+	cmd, err := newNpmCmd("version", "--json")
+	if err != nil {
+		return outbound.RuntimeVersions{}, err
+	}
+	stdout, err := cmd.Output()
+	if err != nil {
+		return outbound.RuntimeVersions{}, fmt.Errorf("npm version falhou: %w", err)
+	}
+
+	var out npmVersionOutput
+	if err := json.Unmarshal(stdout, &out); err != nil {
+		return outbound.RuntimeVersions{}, fmt.Errorf("npm version: saída inválida: %w", err)
+	}
+	if out.Node == "" {
+		return outbound.RuntimeVersions{}, fmt.Errorf("npm version: versão do Node.js ausente na saída")
+	}
+	return outbound.RuntimeVersions{Node: out.Node, Npm: out.Npm}, nil
 }
