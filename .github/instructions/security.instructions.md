@@ -45,8 +45,8 @@ description: 'Segurança — app desktop Go + Fyne (execução do npm, SQLite, b
 - `ci.yml` roda com `contents: read`; `release.yml` com `contents: write` (necessário para
   publicar a release) usando o `GITHUB_TOKEN`. Não ampliar `permissions`.
 - Actions de terceiros (`msys2/setup-msys2`, `softprops/action-gh-release`,
-  `golangci/golangci-lint-action`) estão fixadas por tag de major; action nova ou troca de
-  versão deve ser fixada por SHA de commit.
+  `golangci/golangci-lint-action`) são fixadas por SHA de commit, com a tag em comentário
+  (`@<sha> # vX.Y.Z`); action nova ou troca de versão segue o mesmo padrão, nunca tag móvel.
 - Dependências Go ficam em `go.mod`/`go.sum` versionados; dependência nova exige
-  justificativa na PR. Ferramenta instalada no CI que gera artefato (`fyne`) não deve ganhar
-  novos usos com `@latest`.
+  justificativa na PR. Ferramentas que geram ou validam artefatos têm versão fixa (`fyne`
+  `v1.7.4` e `golangci-lint` `v2.15.0`); nunca `@latest` no CI nem nas instruções de build.

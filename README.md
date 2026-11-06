@@ -80,7 +80,7 @@ Pré-requisitos: Go 1.26+ e Xcode Command Line Tools (veja tabela acima).
 ```bash
 git clone https://github.com/dirsouza/packages-npm.git
 cd packages-npm
-go install fyne.io/tools/cmd/fyne@latest
+go install fyne.io/tools/cmd/fyne@v1.7.4
 make package-macos
 ```
 
