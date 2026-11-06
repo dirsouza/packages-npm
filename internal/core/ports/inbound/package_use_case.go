@@ -60,5 +60,6 @@ type PackageUseCase interface {
 
 	// ImportBackup restaura pacotes de um arquivo CSV.
 	// ImportReplace apaga todos os dados antes de importar; ImportMerge apenas adiciona os ausentes.
+	// Em caso de erro, o ImportResult traz o que já foi gravado antes da falha.
 	ImportBackup(path string, mode domain.ImportMode) (ImportResult, error)
 }

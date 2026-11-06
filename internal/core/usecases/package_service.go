@@ -1,6 +1,8 @@
 package usecases
 
 import (
+	"errors"
+
 	"github.com/dirsouza/packages-npm/internal/core/domain"
 	"github.com/dirsouza/packages-npm/internal/core/ports/inbound"
 	"github.com/dirsouza/packages-npm/internal/core/ports/outbound"
@@ -168,7 +170,8 @@ func (s *PackageService) ExportBackup(path string) error {
 // Modos:
 //   - ImportReplace: apaga todos os registros e restaura com os IDs originais.
 //   - ImportMerge:   mantém os existentes e adiciona apenas os ausentes (por package_name);
-//     entradas já cadastradas ou inválidas são contadas em Skipped.
+//     entradas já cadastradas ou inválidas são contadas em Skipped. Qualquer outra falha
+//     (ex.: banco indisponível) interrompe a importação e volta junto com o resultado parcial.
 func (s *PackageService) ImportBackup(path string, mode domain.ImportMode) (inbound.ImportResult, error) {
 	entries, err := s.backup.Read(path)
 	if err != nil {
@@ -199,6 +202,9 @@ func (s *PackageService) ImportBackup(path string, mode domain.ImportMode) (inbo
 		}
 		dto := inbound.PackageDTO{DisplayName: e.DisplayName, PackageName: e.PackageName, Version: e.Version}
 		if _, err := s.Add(dto); err != nil {
+			if !isRejectedEntry(err) {
+				return result, err
+			}
 			result.Skipped++
 			continue
 		}
@@ -206,6 +212,21 @@ func (s *PackageService) ImportBackup(path string, mode domain.ImportMode) (inbo
 		result.Imported++
 	}
 	return result, nil
+}
+
+func isRejectedEntry(err error) bool {
+	for _, rejected := range []error{
+		domain.ErrDuplicatePackage,
+		domain.ErrEmptyDisplayName,
+		domain.ErrEmptyPackageName,
+		domain.ErrInvalidPackageName,
+		domain.ErrInvalidVersion,
+	} {
+		if errors.Is(err, rejected) {
+			return true
+		}
+	}
+	return false
 }
 
 func packageFromDTO(dto inbound.PackageDTO) (*domain.Package, error) {

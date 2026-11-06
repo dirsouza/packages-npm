@@ -12,6 +12,7 @@ import (
 type fakeRepository struct {
 	outbound.PackageRepository
 	packages []*domain.Package
+	saveErr  map[string]error
 }
 
 func (r *fakeRepository) FindAll(domain.SortOrder) ([]*domain.Package, error) { return r.packages, nil }
@@ -19,6 +20,9 @@ func (r *fakeRepository) FindAll(domain.SortOrder) ([]*domain.Package, error) { 
 func (r *fakeRepository) FindByIDs([]int64) ([]*domain.Package, error) { return r.packages, nil }
 
 func (r *fakeRepository) Save(pkg *domain.Package) (*domain.Package, error) {
+	if err := r.saveErr[pkg.Name.Value()]; err != nil {
+		return nil, err
+	}
 	r.packages = append(r.packages, pkg)
 	return pkg, nil
 }
@@ -92,6 +96,29 @@ func TestImportBackupMergeCountsSkipped(t *testing.T) {
 		t.Fatal(err)
 	}
 	if want := (inbound.ImportResult{Imported: 1, Skipped: 3}); got != want {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+}
+
+func TestImportBackupMergeSaveFailure(t *testing.T) {
+	errLocked := errors.New("database is locked")
+	repo := &fakeRepository{saveErr: map[string]error{
+		"yarn-check":  domain.ErrDuplicatePackage,
+		"http-server": errLocked,
+	}}
+	backup := &fakeBackup{entries: []outbound.BackupEntry{
+		{DisplayName: "TypeScript", PackageName: "typescript"},
+		{DisplayName: "Yarn Check", PackageName: "yarn-check"},
+		{DisplayName: "HTTP Server", PackageName: "http-server"},
+		{DisplayName: "NTL", PackageName: "ntl"},
+	}}
+	service := NewPackageService(repo, nil, nil, backup)
+
+	got, err := service.ImportBackup("backup.csv", domain.ImportMerge)
+	if !errors.Is(err, errLocked) {
+		t.Fatalf("err = %v, want %v", err, errLocked)
+	}
+	if want := (inbound.ImportResult{Imported: 1, Skipped: 1}); got != want {
 		t.Fatalf("got %+v, want %+v", got, want)
 	}
 }

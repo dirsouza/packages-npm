@@ -303,14 +303,14 @@ func (m *MainWindow) onImport() {
 				go func() {
 					result, importErr := m.useCase.ImportBackup(path, mode)
 					fyne.Do(func() {
-						if importErr != nil {
-							components.ShowError(importErr, m.window)
-							m.setStatus("⚠️  Falha ao importar backup.")
-							return
-						}
 						msg := importSummary(result)
-						components.ShowInfo("Backup importado", msg, m.window)
-						m.setStatus("📦  " + msg)
+						if importErr != nil {
+							components.ShowError(fmt.Errorf("%w\n\nAntes da falha: %s", importErr, msg), m.window)
+							m.setStatus("⚠️  Falha ao importar backup. " + msg)
+						} else {
+							components.ShowInfo("Backup importado", msg, m.window)
+							m.setStatus("📦  " + msg)
+						}
 						m.reload()
 						go m.refreshInstallStatus()
 					})
