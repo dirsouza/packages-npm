@@ -151,7 +151,7 @@ Sempre use erros tipados do domínio (`ErrEmptyDisplayName`, `ErrEmptyPackageNam
 - Nunca acessa banco, npm ou sistema de arquivos diretamente
 - Função `packageFromDTO(dto)` centraliza criação de `Package` a partir de DTO — **não duplique essa lógica**
 - `InstallSelected` e `UninstallSelected` compartilham `runOnSelected` (validação dos IDs, busca e progresso); só mudam o argumento do npm e a operação
-- `ImportBackup` devolve `inbound.ImportResult` (`Imported`, `Skipped`): no modo Mesclar, entradas já cadastradas ou inválidas são contadas como ignoradas, nunca descartadas em silêncio
+- `ImportBackup` devolve `inbound.ImportResult` (`Imported`, `Skipped`): no modo Mesclar, só entradas já cadastradas ou inválidas (erros de validação/duplicidade do domínio) contam como ignoradas; qualquer outro erro (ex.: banco indisponível) interrompe e volta com o resultado parcial
 
 ---
 
@@ -239,7 +239,7 @@ O app é aberto pelo Finder/menu do sistema e **não recebe o `PATH` do shell**.
 - Formato: **CSV** com cabeçalho `id,display_name,package_name,version` — a leitura exige esse cabeçalho (aceita o BOM do Excel) e rejeita arquivo sem cabeçalho ou com colunas em outra ordem
 - Adapter: `CSVBackupStorage` em `internal/adapters/backup/`
 - `ImportReplace`: `ReplaceAll()` transacional (BEGIN → DELETE → INSERT → COMMIT/ROLLBACK)
-- `ImportMerge`: adiciona apenas os ausentes por `package_name` e informa quantos foram ignorados
+- `ImportMerge`: adiciona apenas os ausentes por `package_name` e informa quantos foram ignorados; erro que não seja de validação/duplicidade interrompe a importação e devolve o resultado parcial
 - Cada entrada é validada como `domain.Package` antes de qualquer INSERT
 
 ---
@@ -276,7 +276,7 @@ make tidy               # go mod tidy
 make clean              # remove bin/ e dist/
 ```
 
-**Após qualquer alteração de código:** rode `go build ./...`, `go vet ./...`, `go test -race ./...`, `make fmt` e `make lint` — o CI (`ci.yml`) reprova código não formatado, com achados do golangci-lint ou com teste falhando.
+**Após qualquer alteração de código:** rode `go build ./...`, `go vet ./...`, `go test -race ./...`, `make fmt`, `make lint` e o `govulncheck` — o CI (`ci.yml`) reprova código não formatado, com achados do golangci-lint, com teste falhando ou com vulnerabilidade alcançável.
 
 **Comandos que agentes não devem rodar para verificar:** `make run` abre a janela do app e não termina sozinho; `make run`, `make package` e `make package-macos` executam `clean` e apagam `bin/` e `dist/`. Use-os só quando o usuário pedir.
 
@@ -298,7 +298,7 @@ Mudança de comportamento vem com teste que falharia sem ela. A UI (`ui/window`,
 - **Branches:** PRs para `develop` só de `feat/*` ou `fix/*`; PRs para `main` só de `develop` ou `hotfix/*` (validado no `ci.yml`)
 - **Versão:** `Version` e `Build` ficam no `FyneApp.toml` (lidos pelo `Makefile` e pelo `fyne package`; injetados em `cmd/app/version.go` via `-ldflags`). A cada release, suba `Version` (semver) e incremente `Build`
 - **Release:** a tag `v*.*.*` dispara o `release.yml` (Linux e Windows); o `.pkg` do macOS é gerado manualmente com `make package-macos`
-- **Commits:** Conventional Commits com descrição em pt-BR — `tipo(escopo): descrição` (escopos usados: `installer`, `release`, `build`, `review`, `security`)
+- **Commits:** Conventional Commits com descrição em pt-BR — `tipo(escopo): descrição` (escopos usados: `domain`, `usecases`, `persistence`, `installer`, `backup`, `ui`, `deps`, `release`, `build`, `agents`, `readme`, `review`, `security`)
 
 ---
 
@@ -398,4 +398,4 @@ Padrão novo só com problema concreto que os atuais não resolvem.
 6. **Wire em `cmd/app/main.go`** — composition root é o único lugar com visão total
 7. **Propague `fyne.Do`** em qualquer mutação de UI vinda de goroutine
 8. **Escreva ou ajuste o teste** que falharia sem a mudança e aplique as boas práticas acima no código que tocar
-9. **Valide com** `go build ./...`, `go vet ./...`, `go test -race ./...`, `make fmt` e `make lint` antes de encerrar
+9. **Valide com** `go build ./...`, `go vet ./...`, `go test -race ./...`, `make fmt`, `make lint` e `go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...` antes de encerrar

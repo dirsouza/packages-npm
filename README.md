@@ -19,7 +19,7 @@ Permite instalar, desinstalar e gerenciar pacotes npm globais de forma centraliz
 | ✏️ Editar | Atualiza os dados de um pacote existente |
 | 🗑️ Remover | Remove o registro do banco de dados (não desinstala o pacote) |
 | ⬇️ Instalar | Executa `npm install -g` nos pacotes selecionados com progress dialog; em caso de falha, mostra o motivo informado pelo npm |
-| 🚫 Desinstalar | Executa `npm uninstall -g` nos pacotes instalados selecionados |
+| 🚫 Desinstalar | Executa `npm uninstall -g` nos pacotes instalados selecionados; em caso de falha, mostra o motivo informado pelo npm |
 | ✅ Status | Detecta automaticamente se cada pacote está instalado, com versão diferente da fixada ou ausente |
 | 🟢 Node.js | Exibe no rodapé as versões do Node.js e do npm usados pelo app |
 | ☑️ Seleção em massa | Selecionar todos / Desmarcar todos com um clique |
@@ -166,7 +166,7 @@ id,display_name,package_name,version
 2. Selecione o arquivo `.csv`
 3. Escolha o modo:
    - **Substituir tudo** — apaga os registros atuais e restaura com os IDs originais
-   - **Mesclar** — mantém os existentes, adiciona apenas os ausentes e informa quantas linhas foram ignoradas (já cadastradas ou inválidas)
+   - **Mesclar** — mantém os existentes, adiciona apenas os ausentes e informa quantas linhas foram ignoradas (já cadastradas ou inválidas). Se a gravação falhar (ex.: banco indisponível), a importação para e informa quantos pacotes foram importados antes do erro
 
 O arquivo precisa ter o cabeçalho `id,display_name,package_name,version` na primeira linha (arquivos salvos pelo Excel com BOM são aceitos). Arquivo sem cabeçalho ou com colunas em outra ordem é recusado.
 
