@@ -381,7 +381,7 @@ func (m *MainWindow) refreshInstallStatus() {
 // them in the status bar. Designed to run in a goroutine — the UI update is
 // dispatched to the main loop with fyne.Do.
 func (m *MainWindow) refreshRuntime() {
-	text := "Node.js não encontrado"
+	text := "Node.js/npm: falha ao verificar versão"
 	if info, err := m.useCase.CheckRuntime(); err == nil {
 		text = fmt.Sprintf("Node.js %s · npm %s", info.NodeVersion, info.NpmVersion)
 	}
