@@ -191,6 +191,7 @@ go func() {
 - Widgets puros — recebem dados e callbacks, não dependem do use case
 - Não fazem chamadas I/O
 - `MainWindow` é o único presenter que orquestra tudo
+- Erros são exibidos só por `components.ShowError`: texto selecionável e botão **Copiar** (via `fyne.CurrentApp().Clipboard()`), para o usuário levar a saída do npm adiante; não use `dialog.ShowError` direto
 
 ### Tema (`ui/uitheme/DarkTheme`)
 

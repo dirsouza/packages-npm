@@ -20,6 +20,7 @@ Permite instalar, desinstalar e gerenciar pacotes npm globais de forma centraliz
 | 🗑️ Remover | Remove o registro do banco de dados (não desinstala o pacote) |
 | ⬇️ Instalar | Executa `npm install -g` nos pacotes selecionados com progress dialog; em caso de falha, mostra o motivo informado pelo npm |
 | 🚫 Desinstalar | Executa `npm uninstall -g` nos pacotes instalados selecionados; em caso de falha, mostra o motivo informado pelo npm |
+| 📋 Copiar erro | Toda mensagem de erro pode ser selecionada e tem o botão **Copiar** |
 | ✅ Status | Detecta automaticamente se cada pacote está instalado, com versão diferente da fixada ou ausente |
 | 🟢 Node.js | Exibe no rodapé as versões do Node.js e do npm usados pelo app |
 | ☑️ Seleção em massa | Selecionar todos / Desmarcar todos com um clique |
