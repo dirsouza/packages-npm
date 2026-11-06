@@ -1,16 +1,19 @@
 package backup
 
 import (
+	"bufio"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 
 	"github.com/dirsouza/packages-npm/internal/core/ports/outbound"
 )
 
-// csvHeader defines the column order of the backup CSV file.
-// Keeping it explicit makes the format self-documenting and stable.
+const utf8BOM = "\ufeff"
+
 var csvHeader = []string{"id", "display_name", "package_name", "version"}
 
 // CSVBackupStorage implements outbound.BackupStorage using RFC 4180 CSV files.
@@ -25,12 +28,16 @@ var _ outbound.BackupStorage = (*CSVBackupStorage)(nil)
 
 // Write serialises entries to a CSV file at path, ordered by ID.
 // Creates or overwrites the file; compatible with macOS, Linux and Windows.
-func (c *CSVBackupStorage) Write(path string, entries []outbound.BackupEntry) error {
+func (c *CSVBackupStorage) Write(path string, entries []outbound.BackupEntry) (err error) {
 	f, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("backup: criar arquivo: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("backup: fechar arquivo: %w", closeErr))
+		}
+	}()
 
 	w := csv.NewWriter(f)
 
@@ -62,7 +69,7 @@ func (c *CSVBackupStorage) Read(path string) ([]outbound.BackupEntry, error) {
 	}
 	defer f.Close()
 
-	r := csv.NewReader(f)
+	r := csv.NewReader(skipBOM(bufio.NewReader(f)))
 	r.TrimLeadingSpace = true
 
 	rows, err := r.ReadAll()
@@ -71,10 +78,12 @@ func (c *CSVBackupStorage) Read(path string) ([]outbound.BackupEntry, error) {
 	}
 
 	if len(rows) < 1 {
-		return nil, fmt.Errorf("backup: arquivo CSV vazio")
+		return nil, errors.New("backup: arquivo CSV vazio")
+	}
+	if err := checkHeader(rows[0]); err != nil {
+		return nil, err
 	}
 
-	// Skip header row (index 0).
 	entries := make([]outbound.BackupEntry, 0, len(rows)-1)
 	for i, row := range rows[1:] {
 		if len(row) < 4 {
@@ -92,4 +101,22 @@ func (c *CSVBackupStorage) Read(path string) ([]outbound.BackupEntry, error) {
 		})
 	}
 	return entries, nil
+}
+
+// skipBOM drops the UTF-8 BOM that Excel writes before the first field; left in
+// the stream, it breaks the parsing of a quoted header.
+func skipBOM(r *bufio.Reader) *bufio.Reader {
+	if prefix, err := r.Peek(len(utf8BOM)); err == nil && string(prefix) == utf8BOM {
+		_, _ = r.Discard(len(utf8BOM))
+	}
+	return r
+}
+
+// checkHeader rejects files whose columns do not match csvHeader, so a file
+// without header or with reordered columns is not imported with shifted data.
+func checkHeader(header []string) error {
+	if !slices.Equal(header, csvHeader) {
+		return fmt.Errorf("backup: cabeçalho inválido %v (esperado %v)", header, csvHeader)
+	}
+	return nil
 }

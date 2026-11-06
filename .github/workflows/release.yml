@@ -57,12 +57,12 @@ jobs:
       # ── Install fyne CLI ──────────────────────────────────────────────────
       - name: Install fyne CLI (Linux)
         if: runner.os == 'Linux'
-        run: go install fyne.io/tools/cmd/fyne@latest
+        run: go install fyne.io/tools/cmd/fyne@v1.7.4
 
       - name: Install fyne CLI (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: go install fyne.io/tools/cmd/fyne@latest
+        run: go install fyne.io/tools/cmd/fyne@v1.7.4
 
       # fyne package precisa do FyneApp.toml junto do source; sem ele (ou com
       # TOML inválido — Build deve ser inteiro) o bundle sai como "app" e sem
@@ -148,25 +148,26 @@ jobs:
             baixados da internet. Compilando localmente o app não recebe o
             atributo de quarentena e abre sem avisos.
 
-            Pré-requisitos: [Go 1.21+](https://go.dev/dl/) e Xcode Command Line
+            Pré-requisitos: [Go 1.26+](https://go.dev/dl/) e Xcode Command Line
             Tools (`xcode-select --install`).
 
             ```bash
             git clone https://github.com/dirsouza/packages-npm.git
             cd packages-npm
             git checkout ${{ github.ref_name }}
-            go install fyne.io/tools/cmd/fyne@latest
+            go install fyne.io/tools/cmd/fyne@v1.7.4
             make package-macos
             ```
 
-            O comando gera o `Packages NPM.app`, empacota um instalador
-            `dist/packages-npm-<versão>.pkg` (que instala em `/Applications`)
-            e já instala o `.app` em `/Applications` — ou em `~/Applications`
-            caso o usuário não tenha permissão de escrita. Ao final, apenas o
-            `.pkg` permanece em `dist/`.
+            O comando apenas gera o instalador `dist/packages-npm-<versão>.pkg`
+            (para a arquitetura do Mac que fez o build) — nada é instalado. Ao
+            abrir o `.pkg`, o `Packages NPM.app` é instalado em `~/Applications`
+            (somente para o usuário atual), sem exigir permissão de
+            administrador. Pelo terminal:
 
-            O `.app` precisa estar em uma pasta Applications para funcionar
-            corretamente.
+            ```bash
+            installer -pkg dist/packages-npm-*.pkg -target CurrentUserHomeDirectory
+            ```
 
             **Linux**
             ```bash

@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 )
 
@@ -39,20 +38,7 @@ func resolveAsdfNpm(home string) (string, error) {
 		}
 	}
 
-	matches, _ := filepath.Glob(filepath.Join(installs, "*", "bin", "npm"))
-	newest := ""
-	for _, m := range matches {
-		if !isExecutable(m) {
-			continue
-		}
-		if newest == "" || compareVersions(versionOf(m), versionOf(newest)) > 0 {
-			newest = m
-		}
-	}
-	if newest == "" {
-		return "", fmt.Errorf("nenhuma versão do nodejs instalada via asdf")
-	}
-	return newest, nil
+	return globNewest(filepath.Join(installs, "*", "bin", "npm"), 2)
 }
 
 // asdfNodeVersion returns the globally selected nodejs version, or "" when
@@ -88,31 +74,6 @@ func usableAsdfVersion(ver string) string {
 		return ""
 	}
 	return ver
-}
-
-// versionOf extracts "<version>" from ".../installs/nodejs/<version>/bin/npm".
-func versionOf(npmPath string) string {
-	return filepath.Base(filepath.Dir(filepath.Dir(npmPath)))
-}
-
-// compareVersions compares dotted numeric versions segment by segment
-// (24.14.0 > 24.9.0); non-numeric segments compare as strings.
-func compareVersions(a, b string) int {
-	as, bs := strings.Split(a, "."), strings.Split(b, ".")
-	for i := 0; i < len(as) && i < len(bs); i++ {
-		ai, aErr := strconv.Atoi(as[i])
-		bi, bErr := strconv.Atoi(bs[i])
-		if aErr == nil && bErr == nil {
-			if ai != bi {
-				return ai - bi
-			}
-			continue
-		}
-		if c := strings.Compare(as[i], bs[i]); c != 0 {
-			return c
-		}
-	}
-	return len(as) - len(bs)
 }
 
 // reshimAsdf regenerates asdf shims after a global install/uninstall so new

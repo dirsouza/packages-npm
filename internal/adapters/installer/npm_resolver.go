@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
@@ -70,8 +71,8 @@ func resolveNpmUnix(found func(string) (npmLocation, error)) (npmLocation, error
 		return found(p)
 	}
 
-	// fnm — newest version installed
-	if p, err := globLast(filepath.Join(home, ".local", "share", "fnm", "node-versions", "*", "installation", "bin", "npm")); err == nil {
+	// fnm — newest version installed (.../node-versions/<version>/installation/bin/npm)
+	if p, err := globNewest(filepath.Join(home, ".local", "share", "fnm", "node-versions", "*", "installation", "bin", "npm"), 3); err == nil {
 		return found(p)
 	}
 
@@ -88,8 +89,8 @@ func resolveNpmUnix(found func(string) (npmLocation, error)) (npmLocation, error
 		}
 	}
 
-	// nvm — fallback: lexicographically last (newest) installed version
-	if p, err := globLast(filepath.Join(home, ".nvm", "versions", "node", "*", "bin", "npm")); err == nil {
+	// nvm — fallback: newest installed version (.../node/<version>/bin/npm)
+	if p, err := globNewest(filepath.Join(home, ".nvm", "versions", "node", "*", "bin", "npm"), 2); err == nil {
 		return found(p)
 	}
 
@@ -124,12 +125,12 @@ func resolveNpmWindows(found func(string) (npmLocation, error)) (npmLocation, er
 	}
 
 	// nvm-windows (~\AppData\Roaming\nvm\<version>\npm.cmd)
-	if p, err := globLast(filepath.Join(appData, "nvm", "v*", "npm.cmd")); err == nil {
+	if p, err := globNewest(filepath.Join(appData, "nvm", "v*", "npm.cmd"), 1); err == nil {
 		return found(p)
 	}
 
-	// fnm on Windows (~\AppData\Local\fnm\node-versions\*\installation\npm.cmd)
-	if p, err := globLast(filepath.Join(localAppData, "fnm", "node-versions", "*", "installation", "npm.cmd")); err == nil {
+	// fnm on Windows (~\AppData\Local\fnm\node-versions\<version>\installation\npm.cmd)
+	if p, err := globNewest(filepath.Join(localAppData, "fnm", "node-versions", "*", "installation", "npm.cmd"), 2); err == nil {
 		return found(p)
 	}
 
@@ -203,14 +204,57 @@ func isExecutable(path string) bool {
 	return info.Mode()&0o111 != 0
 }
 
-// globLast returns the lexicographically last match for pattern (newest
-// semver-named directory when sorted by name).
-func globLast(pattern string) (string, error) {
+// globNewest returns the executable match of pattern with the highest version.
+// versionDepth is how many levels above the executable the version directory
+// sits (e.g. 2 for ".../<version>/bin/npm"); a leading "v" is ignored.
+func globNewest(pattern string, versionDepth int) (string, error) {
 	matches, err := filepath.Glob(pattern)
-	if err != nil || len(matches) == 0 {
-		return "", fmt.Errorf("nenhum match para %s", pattern)
+	if err != nil {
+		return "", fmt.Errorf("padrão inválido %s: %w", pattern, err)
 	}
-	return matches[len(matches)-1], nil
+	newest, newestVer := "", ""
+	for _, m := range matches {
+		if !isExecutable(m) {
+			continue
+		}
+		ver := versionDir(m, versionDepth)
+		if newest == "" || compareVersions(ver, newestVer) > 0 {
+			newest, newestVer = m, ver
+		}
+	}
+	if newest == "" {
+		return "", fmt.Errorf("nenhum npm executável para %s", pattern)
+	}
+	return newest, nil
+}
+
+// versionDir returns the name of the directory versionDepth levels above path,
+// without a leading "v" (".../v24.1.0/bin/npm", 2 → "24.1.0").
+func versionDir(path string, versionDepth int) string {
+	for range versionDepth {
+		path = filepath.Dir(path)
+	}
+	return strings.TrimPrefix(filepath.Base(path), "v")
+}
+
+// compareVersions compares dotted numeric versions segment by segment
+// (24.14.0 > 24.9.0); non-numeric segments compare as strings.
+func compareVersions(a, b string) int {
+	as, bs := strings.Split(a, "."), strings.Split(b, ".")
+	for i := 0; i < len(as) && i < len(bs); i++ {
+		ai, aErr := strconv.Atoi(as[i])
+		bi, bErr := strconv.Atoi(bs[i])
+		if aErr == nil && bErr == nil {
+			if ai != bi {
+				return ai - bi
+			}
+			continue
+		}
+		if c := strings.Compare(as[i], bs[i]); c != 0 {
+			return c
+		}
+	}
+	return len(as) - len(bs)
 }
 
 func errNotFound() error {

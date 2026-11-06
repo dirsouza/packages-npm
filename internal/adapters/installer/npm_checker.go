@@ -1,8 +1,11 @@
 package installer
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os/exec"
 
 	"github.com/dirsouza/packages-npm/internal/core/ports/outbound"
 )
@@ -79,15 +82,24 @@ func (c *NpmPackageChecker) CheckRuntime() (outbound.RuntimeVersions, error) {
 	}
 	stdout, err := cmd.Output()
 	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return outbound.RuntimeVersions{}, fmt.Errorf("npm version falhou: %w: %s", err, bytes.TrimSpace(exitErr.Stderr))
+		}
 		return outbound.RuntimeVersions{}, fmt.Errorf("npm version falhou: %w", err)
 	}
+	return parseRuntimeVersions(stdout)
+}
 
+// parseRuntimeVersions extracts the Node.js and npm versions from the output
+// of `npm version --json`; both are required.
+func parseRuntimeVersions(stdout []byte) (outbound.RuntimeVersions, error) {
 	var out npmVersionOutput
 	if err := json.Unmarshal(stdout, &out); err != nil {
 		return outbound.RuntimeVersions{}, fmt.Errorf("npm version: saída inválida: %w", err)
 	}
-	if out.Node == "" {
-		return outbound.RuntimeVersions{}, fmt.Errorf("npm version: versão do Node.js ausente na saída")
+	if out.Node == "" || out.Npm == "" {
+		return outbound.RuntimeVersions{}, errors.New("npm version: versões do Node.js/npm ausentes na saída")
 	}
 	return outbound.RuntimeVersions{Node: out.Node, Npm: out.Npm}, nil
 }

@@ -40,15 +40,40 @@ func ShowPackageForm(
 			return
 		}
 		if displayEntry.Text == "" || packageEntry.Text == "" {
-			dialog.ShowError(errRequiredFields, parent)
+			ShowError(errRequiredFields, parent)
 			return
 		}
 		onConfirm(displayEntry.Text, packageEntry.Text, versionEntry.Text)
 	}, parent)
 }
 
-// ShowError forwards to dialog.ShowError.
-func ShowError(err error, parent fyne.Window) { dialog.ShowError(err, parent) }
+const (
+	errorDialogWidth  = 560
+	errorDialogHeight = 240
+)
+
+// ShowError shows err with selectable text and a copy button, so long causes
+// such as the npm output can be pasted elsewhere.
+func ShowError(err error, parent fyne.Window) {
+	text := err.Error()
+	message := widget.NewLabel(text)
+	message.Selectable = true
+	message.Wrapping = fyne.TextWrapWord
+
+	dlg := dialog.NewCustomWithoutButtons("Erro", container.NewVScroll(message), parent)
+	copyBtn := widget.NewButtonWithIcon("Copiar", theme.ContentCopyIcon(), nil)
+	copyBtn.OnTapped = func() {
+		fyne.CurrentApp().Clipboard().SetContent(text)
+		copyBtn.SetText("Copiado")
+	}
+	okBtn := widget.NewButton("OK", dlg.Hide)
+	okBtn.Importance = widget.HighImportance
+
+	dlg.SetButtons([]fyne.CanvasObject{copyBtn, okBtn})
+	dlg.SetIcon(theme.ErrorIcon())
+	dlg.Resize(fyne.NewSize(errorDialogWidth, errorDialogHeight))
+	dlg.Show()
+}
 
 // ShowInfo forwards to dialog.ShowInformation.
 func ShowInfo(title, message string, parent fyne.Window) {
