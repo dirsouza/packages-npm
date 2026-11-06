@@ -22,8 +22,8 @@ Este arquivo orienta assistentes de IA sobre as convenções, regras arquitetura
   - macOS: `xcode-select --install`
   - Linux: `sudo apt-get install gcc libgl1-mesa-dev xorg-dev libwayland-dev libxkbcommon-dev`
   - Windows: GCC do MinGW-w64 (o CI usa `mingw-w64-x86_64-gcc` via MSYS2)
-- **fyne CLI** (para `make package*`): `go install fyne.io/tools/cmd/fyne@latest`
-- **golangci-lint v2** (para `make lint`; o `.golangci.yml` usa `version: "2"`): `brew install golangci-lint` ou `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest`
+- **fyne CLI** (para `make package*`): `go install fyne.io/tools/cmd/fyne@v1.7.4`
+- **golangci-lint v2** (para `make lint`; o `.golangci.yml` usa `version: "2"`): `brew install golangci-lint` ou `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0`
 
 ---
 
@@ -248,7 +248,7 @@ Resumo das regras; o detalhamento está em `.github/instructions/security.instru
 - **SQL:** valores sempre como parâmetro `?`; partes dinâmicas da query só via whitelist (`sortColumn`) ou lista de placeholders
 - **CSV importado** é entrada externa: validar cada linha antes de gravar e manter o `ReplaceAll` transacional
 - **Empacotamento:** o `.pkg` instala só no domínio do usuário, sem scripts de pré/pós-instalação
-- **CI:** não ampliar `permissions` dos workflows; dependência ou action nova exige justificativa na PR
+- **CI:** não ampliar `permissions` dos workflows; actions de terceiros fixadas por SHA (com a tag em comentário) e ferramentas com versão fixa (`fyne` v1.7.4, `golangci-lint` v2.15.0); dependência ou action nova exige justificativa na PR
 
 ---
 
@@ -269,7 +269,7 @@ make tidy               # go mod tidy
 make clean              # remove bin/ e dist/
 ```
 
-**Após qualquer alteração de código:** rode `go build ./...`, `go vet ./...`, `go test -race ./...`, `make fmt` e `make lint` — o CI (`ci.yml`) reprova código não formatado ou com achados do golangci-lint (os testes ainda não rodam no CI).
+**Após qualquer alteração de código:** rode `go build ./...`, `go vet ./...`, `go test -race ./...`, `make fmt` e `make lint` — o CI (`ci.yml`) reprova código não formatado, com achados do golangci-lint ou com teste falhando.
 
 **Comandos que agentes não devem rodar para verificar:** `make run` abre a janela do app e não termina sozinho; `make run`, `make package` e `make package-macos` executam `clean` e apagam `bin/` e `dist/`. Use-os só quando o usuário pedir.
 
