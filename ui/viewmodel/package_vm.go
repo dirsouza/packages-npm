@@ -26,6 +26,7 @@ type PackageVM struct {
 	DisplayName      string
 	PackageName      string
 	Version          string
+	ExactVersion     bool
 	Selected         bool
 	InstallStatus    InstallStatus
 	InstalledVersion string
@@ -40,6 +41,7 @@ func FromDomain(p *domain.Package) PackageVM {
 		DisplayName:   p.DisplayName,
 		PackageName:   p.Name.Value(),
 		Version:       p.Version.Value(),
+		ExactVersion:  p.Version.IsExact(),
 		InstallStatus: StatusUnknown,
 		CreatedAt:     p.CreatedAt,
 		UpdatedAt:     p.UpdatedAt,
@@ -96,7 +98,8 @@ func (vm PackageVM) VersionLabel() string {
 func (vm PackageVM) HasVersion() bool { return vm.Version != "" }
 
 // ResolveInstallStatus computes the InstallStatus based on what is installed
-// versus what is expected. Call this after receiving CheckInstalled results.
+// versus what is expected. Only an exact version can mismatch: ranges,
+// wildcards and dist-tags accept the installed version.
 func (vm *PackageVM) ResolveInstallStatus(installedVersion string, isInstalled bool) {
 	if !isInstalled {
 		vm.InstallStatus = StatusMissing
@@ -104,13 +107,9 @@ func (vm *PackageVM) ResolveInstallStatus(installedVersion string, isInstalled b
 		return
 	}
 	vm.InstalledVersion = installedVersion
-	switch {
-	case !vm.HasVersion():
-		// No version pinned → any installed version is "correct".
-		vm.InstallStatus = StatusInstalled
-	case vm.Version == installedVersion:
-		vm.InstallStatus = StatusInstalled
-	default:
+	if vm.ExactVersion && vm.Version != installedVersion {
 		vm.InstallStatus = StatusMismatch
+		return
 	}
+	vm.InstallStatus = StatusInstalled
 }
