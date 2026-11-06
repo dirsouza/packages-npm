@@ -20,15 +20,16 @@ import (
 // MainWindow orchestrates the main window layout and user interactions.
 // Presenter role: calls use cases and keeps the view in sync.
 type MainWindow struct {
-	window    fyne.Window
-	useCase   inbound.PackageUseCase
-	items     []viewmodel.PackageVM
-	pkgList   *components.PackageList
-	statusBar *widget.Label
-	statsBar  *widget.Label
-	sortOrder domain.SortOrder
-	version   string
-	build     string
+	window      fyne.Window
+	useCase     inbound.PackageUseCase
+	items       []viewmodel.PackageVM
+	pkgList     *components.PackageList
+	statusBar   *widget.Label
+	statsBar    *widget.Label
+	runtimeInfo *canvas.Text
+	sortOrder   domain.SortOrder
+	version     string
+	build       string
 }
 
 // NewMainWindow constructs the presenter with its dependencies.
@@ -52,7 +53,7 @@ func NewMainWindow(w fyne.Window, useCase inbound.PackageUseCase, version, build
 //	SelectionBar     — "Selecionar todos" / "Desmarcar todos" (discreto)
 //	PackageList      — lista scrollável de cards (ocupa o espaço restante)
 //	Separator
-//	StatusBar        — última mensagem de operação
+//	StatusBar        — última mensagem de operação + versões do Node.js/npm e do app
 func (m *MainWindow) Build() {
 	m.statusBar = components.NewStatusBar("Verificando pacotes instalados...")
 	m.statsBar = components.NewStatsBar(0, 0)
@@ -78,20 +79,26 @@ func (m *MainWindow) Build() {
 		container.NewPadded(controlBar),
 		widget.NewSeparator(),
 	)
-	versionLabel := canvas.NewText(
-		fmt.Sprintf("Versão: %s (Build: %s)", m.version, m.build),
-		color.RGBA{R: 148, G: 163, B: 184, A: 255}, // slate-400 — discreto mas legível
-	)
-	versionLabel.TextSize = 11
-	versionLabel.Alignment = fyne.TextAlignTrailing
+	versionLabel := newFooterText(fmt.Sprintf("Versão: %s (Build: %s)", m.version, m.build))
+	m.runtimeInfo = newFooterText("Node.js: verificando...")
+	footerInfo := container.NewHBox(m.runtimeInfo, newFooterText("·"), versionLabel)
 
-	bottomBar := container.NewBorder(nil, nil, m.statusBar, versionLabel)
+	bottomBar := container.NewBorder(nil, nil, m.statusBar, footerInfo)
 	bottom := container.NewVBox(widget.NewSeparator(), container.NewPadded(bottomBar))
 
 	m.window.SetContent(container.NewBorder(top, bottom, nil, nil, m.pkgList))
 
 	m.reload()
 	go m.refreshInstallStatus()
+	go m.refreshRuntime()
+}
+
+// newFooterText creates the small, muted text used for the version info in the status bar.
+func newFooterText(text string) *canvas.Text {
+	t := canvas.NewText(text, color.RGBA{R: 148, G: 163, B: 184, A: 255}) // slate-400 — discreto mas legível
+	t.TextSize = 11
+	t.Alignment = fyne.TextAlignTrailing
+	return t
 }
 
 // ── event handlers ────────────────────────────────────────────────────────────
@@ -367,6 +374,21 @@ func (m *MainWindow) refreshInstallStatus() {
 
 		m.pkgList.SetItems(m.items)
 		m.setStatus("✅  Status de instalação atualizado.")
+	})
+}
+
+// refreshRuntime queries the Node.js and npm versions used by the app and shows
+// them in the status bar. Designed to run in a goroutine — the UI update is
+// dispatched to the main loop with fyne.Do.
+func (m *MainWindow) refreshRuntime() {
+	text := "Node.js não encontrado"
+	if info, err := m.useCase.CheckRuntime(); err == nil {
+		text = fmt.Sprintf("Node.js %s · npm %s", info.NodeVersion, info.NpmVersion)
+	}
+
+	fyne.Do(func() {
+		m.runtimeInfo.Text = text
+		m.runtimeInfo.Refresh()
 	})
 }
 

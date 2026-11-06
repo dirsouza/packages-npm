@@ -145,6 +145,15 @@ func (s *PackageService) CheckInstalled() (map[string]inbound.InstalledInfo, err
 	return result, nil
 }
 
+// CheckRuntime returns the Node.js and npm versions used to install and check packages.
+func (s *PackageService) CheckRuntime() (inbound.RuntimeInfo, error) {
+	versions, err := s.checker.CheckRuntime()
+	if err != nil {
+		return inbound.RuntimeInfo{}, err
+	}
+	return inbound.RuntimeInfo{NodeVersion: versions.Node, NpmVersion: versions.Npm}, nil
+}
+
 // ExportBackup serializa todos os pacotes cadastrados em um arquivo CSV portável,
 // ordenados pelo ID de inserção.
 func (s *PackageService) ExportBackup(path string) error {

@@ -135,7 +135,7 @@ Sempre use erros tipados do domínio (`ErrEmptyDisplayName`, `ErrEmptyPackageNam
 | --- | --- |
 | `PackageRepository` | CRUD + ReplaceAll + Restore |
 | `PackageInstaller` | Install / Uninstall via npm |
-| `PackageChecker` | ListGlobalInstalled via npm list |
+| `PackageChecker` | ListGlobalInstalled via `npm list`; CheckRuntime (versões do Node.js e npm) via `npm version` |
 | `BackupStorage` | Write / Read de arquivo de backup |
 | `ProgressFn` | Callback de progresso (tipo, não interface) |
 
