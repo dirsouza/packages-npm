@@ -22,3 +22,25 @@ func TestParseRuntimeVersions(t *testing.T) {
 		})
 	}
 }
+
+func TestNpmErrorSummary(t *testing.T) {
+	tests := map[string]struct {
+		output, want string
+	}{
+		"mantém só as linhas npm error": {
+			output: "npm warn deprecated x\nnpm error code EEXIST\nnpm error path /bin/yarn\nnpm error EEXIST: file already exists\nnpm error extra\n",
+			want:   "code EEXIST; path /bin/yarn; EEXIST: file already exists",
+		},
+		"sem linhas npm error devolve a saída": {
+			output: "  falha inesperada\n",
+			want:   "falha inesperada",
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := npmErrorSummary([]byte(tt.output)); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

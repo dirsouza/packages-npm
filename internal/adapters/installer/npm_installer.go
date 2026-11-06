@@ -2,44 +2,57 @@ package installer
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/dirsouza/packages-npm/internal/core/domain"
 	"github.com/dirsouza/packages-npm/internal/core/ports/outbound"
 )
+
+const maxErrorLines = 3
 
 // NpmInstaller implements outbound.PackageInstaller using the system npm CLI.
 type NpmInstaller struct{}
 
 func NewNpmInstaller() *NpmInstaller { return &NpmInstaller{} }
 
-// Compile-time assertion.
 var _ outbound.PackageInstaller = (*NpmInstaller)(nil)
 
-// Install runs `npm install -g <pkgTarget>` and returns a descriptive error on failure.
+// Install runs `npm install -g <pkgTarget>`.
 func (n *NpmInstaller) Install(pkgTarget string) error {
-	cmd, err := newNpmCmd("install", "-g", pkgTarget)
+	return runGlobal(domain.ErrInstallFailed, "install", pkgTarget)
+}
+
+// Uninstall runs `npm uninstall -g <pkgName>`; pkgName must not carry a version.
+func (n *NpmInstaller) Uninstall(pkgName string) error {
+	return runGlobal(domain.ErrUninstallFailed, "uninstall", pkgName)
+}
+
+func runGlobal(failure error, command, arg string) error {
+	cmd, err := newNpmCmd(command, "-g", arg)
 	if err != nil {
-		return fmt.Errorf("%w: %s — %s", domain.ErrInstallFailed, pkgTarget, err.Error())
+		return fmt.Errorf("%w: %s — %w", failure, arg, err)
 	}
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%w: %s — %s", domain.ErrInstallFailed, pkgTarget, string(output))
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("%w: %s — %s", failure, arg, npmErrorSummary(output))
 	}
 	reshimAsdf(cmd.Path)
 	return nil
 }
 
-// Uninstall runs `npm uninstall -g <pkgName>` and returns a descriptive error on failure.
-// Note: pkgName should be the bare package name (e.g. "typescript"), without version.
-func (n *NpmInstaller) Uninstall(pkgName string) error {
-	cmd, err := newNpmCmd("uninstall", "-g", pkgName)
-	if err != nil {
-		return fmt.Errorf("%w: %s — %s", domain.ErrUninstallFailed, pkgName, err.Error())
+// npmErrorSummary keeps the first "npm error" lines, which carry the cause of
+// the failure, instead of the whole npm log.
+func npmErrorSummary(output []byte) string {
+	var lines []string
+	for line := range strings.Lines(string(output)) {
+		if cause, ok := strings.CutPrefix(line, "npm error"); ok {
+			lines = append(lines, strings.TrimSpace(cause))
+			if len(lines) == maxErrorLines {
+				break
+			}
+		}
 	}
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%w: %s — %s", domain.ErrUninstallFailed, pkgName, string(output))
+	if len(lines) == 0 {
+		return strings.TrimSpace(string(output))
 	}
-	reshimAsdf(cmd.Path)
-	return nil
+	return strings.Join(lines, "; ")
 }
