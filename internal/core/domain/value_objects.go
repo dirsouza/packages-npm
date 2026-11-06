@@ -8,6 +8,7 @@ import (
 var versionRegex = regexp.MustCompile(`^$|^\*$|^[~^><]=?\d[\w.*-]*$|^\d[\w.*-]*$|^[a-zA-Z][a-zA-Z0-9._-]*$`)
 
 // PackageName represents a non-empty npm package identifier (trimmed).
+// It never starts with "-", so it cannot be read as an npm flag.
 // Value Object: immutable, equality by value.
 type PackageName struct {
 	value string
@@ -17,6 +18,9 @@ func NewPackageName(raw string) (PackageName, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
 		return PackageName{}, ErrEmptyPackageName
+	}
+	if strings.HasPrefix(trimmed, "-") {
+		return PackageName{}, ErrInvalidPackageName
 	}
 	return PackageName{value: trimmed}, nil
 }
