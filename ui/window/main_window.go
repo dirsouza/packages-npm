@@ -3,6 +3,7 @@ package window
 import (
 	"fmt"
 	"image/color"
+	"log"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -382,7 +383,10 @@ func (m *MainWindow) refreshInstallStatus() {
 // dispatched to the main loop with fyne.Do.
 func (m *MainWindow) refreshRuntime() {
 	text := "Node.js/npm: falha ao verificar versão"
-	if info, err := m.useCase.CheckRuntime(); err == nil {
+	info, err := m.useCase.CheckRuntime()
+	if err != nil {
+		log.Printf("verificar versões do Node.js/npm: %v", err)
+	} else {
 		text = fmt.Sprintf("Node.js %s · npm %s", info.NodeVersion, info.NpmVersion)
 	}
 
