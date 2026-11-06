@@ -88,6 +88,9 @@ jobs:
           version: v2.15.0
           args: --timeout=5m
 
+      - name: Run govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
   build:
     name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
