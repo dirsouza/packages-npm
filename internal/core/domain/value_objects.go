@@ -5,11 +5,17 @@ import (
 	"strings"
 )
 
-var versionRegex = regexp.MustCompile(`^$|^\*$|^[~^><]=?\d[\w.*-]*$|^\d[\w.*-]*$|^[a-zA-Z][a-zA-Z0-9._-]*$`)
+const maxPackageNameLength = 214
 
-// PackageName represents a non-empty npm package identifier (trimmed).
-// It never starts with "-", so it cannot be read as an npm flag.
-// Value Object: immutable, equality by value.
+var (
+	versionRegex      = regexp.MustCompile(`^$|^\*$|^[~^><]=?\d[\w.*-]*$|^\d[\w.*-]*$|^[a-zA-Z][a-zA-Z0-9._-]*$`)
+	exactVersionRegex = regexp.MustCompile(`^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$`)
+	packageNameRegex  = regexp.MustCompile(`^(@[a-zA-Z0-9~][a-zA-Z0-9._~-]*/)?[a-zA-Z0-9~][a-zA-Z0-9._~-]*$`)
+)
+
+// PackageName is an npm package identifier following npm naming rules
+// (URL-safe characters and an optional @scope/). It rejects flags, URLs,
+// paths and shell metacharacters, so it is safe as an npm argument.
 type PackageName struct {
 	value string
 }
@@ -19,7 +25,7 @@ func NewPackageName(raw string) (PackageName, error) {
 	if trimmed == "" {
 		return PackageName{}, ErrEmptyPackageName
 	}
-	if strings.HasPrefix(trimmed, "-") {
+	if len(trimmed) > maxPackageNameLength || !packageNameRegex.MatchString(trimmed) {
 		return PackageName{}, ErrInvalidPackageName
 	}
 	return PackageName{value: trimmed}, nil
@@ -53,5 +59,9 @@ func (v Version) String() string {
 	}
 	return v.value
 }
-func (v Version) IsDefined() bool       { return v.value != "" }
+func (v Version) IsDefined() bool { return v.value != "" }
+
+// IsExact reports whether the version pins a single release instead of a
+// range, wildcard or dist-tag.
+func (v Version) IsExact() bool         { return exactVersionRegex.MatchString(v.value) }
 func (v Version) Equals(o Version) bool { return v.value == o.value }

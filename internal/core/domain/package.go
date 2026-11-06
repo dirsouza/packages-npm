@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // Package is the core entity of the application.
 // It represents an npm package that can be installed globally.
@@ -23,7 +26,7 @@ func (p *Package) InstallTarget() string {
 
 // Validate checks business rules on the entity.
 func (p *Package) Validate() error {
-	if p.DisplayName == "" {
+	if strings.TrimSpace(p.DisplayName) == "" {
 		return ErrEmptyDisplayName
 	}
 	return nil
