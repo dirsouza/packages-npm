@@ -177,7 +177,7 @@ func (m *MainWindow) onInstall() {
 	go func() {
 		err := m.useCase.InstallSelected(selected, func(target string, done, total int, installErr error) {
 			if installErr != nil {
-				failures = append(failures, target)
+				failures = append(failures, installErr.Error())
 			}
 			fyne.Do(func() {
 				progressDlg.Update(target, done, total, installErr)
@@ -232,7 +232,7 @@ func (m *MainWindow) onUninstall() {
 		go func() {
 			err := m.useCase.UninstallSelected(ids, func(target string, done, total int, opErr error) {
 				if opErr != nil {
-					failures = append(failures, target)
+					failures = append(failures, opErr.Error())
 				}
 				fyne.Do(func() {
 					progressDlg.Update(target, done, total, opErr)
@@ -301,16 +301,16 @@ func (m *MainWindow) onImport() {
 				}
 				m.setStatus("⏳  Importando backup...")
 				go func() {
-					imported, importErr := m.useCase.ImportBackup(path, mode)
+					result, importErr := m.useCase.ImportBackup(path, mode)
 					fyne.Do(func() {
 						if importErr != nil {
 							components.ShowError(importErr, m.window)
 							m.setStatus("⚠️  Falha ao importar backup.")
 							return
 						}
-						components.ShowInfo("Backup importado",
-							fmt.Sprintf("%d pacote(s) importado(s) com sucesso.", imported), m.window)
-						m.setStatus(fmt.Sprintf("📦  %d pacote(s) importado(s).", imported))
+						msg := importSummary(result)
+						components.ShowInfo("Backup importado", msg, m.window)
+						m.setStatus("📦  " + msg)
 						m.reload()
 						go m.refreshInstallStatus()
 					})
@@ -322,6 +322,14 @@ func (m *MainWindow) onImport() {
 
 	dlg.SetFilter(storage.NewExtensionFileFilter([]string{".csv"}))
 	dlg.Show()
+}
+
+func importSummary(result inbound.ImportResult) string {
+	msg := fmt.Sprintf("%d pacote(s) importado(s).", result.Imported)
+	if result.Skipped > 0 {
+		msg += fmt.Sprintf(" %d ignorado(s): já cadastrado(s) ou inválido(s).", result.Skipped)
+	}
+	return msg
 }
 
 func (m *MainWindow) reload() {

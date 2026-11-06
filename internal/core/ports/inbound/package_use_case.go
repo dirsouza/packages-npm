@@ -27,6 +27,13 @@ type RuntimeInfo struct {
 	NpmVersion  string
 }
 
+// ImportResult reports how many backup entries were imported and how many were
+// skipped (already registered or invalid).
+type ImportResult struct {
+	Imported int
+	Skipped  int
+}
+
 // PackageUseCase is the inbound port — the contract the UI depends on.
 // Each method maps to a distinct use case (SRP + ISP).
 type PackageUseCase interface {
@@ -53,5 +60,5 @@ type PackageUseCase interface {
 
 	// ImportBackup restaura pacotes de um arquivo CSV.
 	// ImportReplace apaga todos os dados antes de importar; ImportMerge apenas adiciona os ausentes.
-	ImportBackup(path string, mode domain.ImportMode) (imported int, err error)
+	ImportBackup(path string, mode domain.ImportMode) (ImportResult, error)
 }
