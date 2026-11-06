@@ -10,9 +10,6 @@ type PackageRepository interface {
 	Save(pkg *domain.Package) (*domain.Package, error)
 	Update(pkg *domain.Package) error
 	Delete(id int64) error
-	DeleteAll() error
-	// Restore inserts entries with their original IDs without deleting existing records.
-	Restore(entries []BackupEntry) error
-	// ReplaceAll atomically deletes existing records and restores entries with their original IDs (ImportReplace).
+	// ReplaceAll atomically deletes existing records and restores entries with their original IDs.
 	ReplaceAll(entries []BackupEntry) error
 }
