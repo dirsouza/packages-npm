@@ -64,5 +64,5 @@ func (d *ProgressDialog) Finish(parent fyne.Window, failures []string) {
 	for _, f := range failures {
 		msg += "• " + f + "\n"
 	}
-	dialog.ShowError(errors.New(msg), parent)
+	ShowError(errors.New(msg), parent)
 }

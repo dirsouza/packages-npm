@@ -56,7 +56,7 @@ package-macos: clean ## Gera o instalador .pkg do macOS (instala em ~/Applicatio
 		echo "❌ package-macos é suportado apenas no macOS"; exit 1; \
 	fi
 	@command -v fyne >/dev/null 2>&1 || { \
-		echo "❌ fyne CLI não encontrado. Instale com: go install fyne.io/tools/cmd/fyne@latest"; exit 1; }
+		echo "❌ fyne CLI não encontrado. Instale com: go install fyne.io/tools/cmd/fyne@v1.7.4"; exit 1; }
 	@command -v pkgbuild >/dev/null 2>&1 || { echo "❌ pkgbuild não encontrado."; exit 1; }
 	@command -v productbuild >/dev/null 2>&1 || { echo "❌ productbuild não encontrado."; exit 1; }
 	@echo "🍎 Empacotando $(APP_NAME).app..."

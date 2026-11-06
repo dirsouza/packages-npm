@@ -3,6 +3,7 @@ package persistence
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -144,11 +145,6 @@ func (r *SQLitePackageRepository) Delete(id int64) error {
 	return err
 }
 
-func (r *SQLitePackageRepository) DeleteAll() error {
-	_, err := r.conn.DB.Exec(`DELETE FROM packages`)
-	return err
-}
-
 func (r *SQLitePackageRepository) ReplaceAll(entries []outbound.BackupEntry) (err error) {
 	packages, err := packagesFromBackupEntries(entries)
 	if err != nil {
@@ -177,38 +173,14 @@ func (r *SQLitePackageRepository) ReplaceAll(entries []outbound.BackupEntry) (er
 	defer stmt.Close()
 
 	now := time.Now().UTC()
-	for i, pkg := range packages {
-		if _, err = stmt.Exec(entries[i].ID, pkg.DisplayName, pkg.Name.Value(), pkg.Version.Value(), now, now); err != nil {
+	for _, pkg := range packages {
+		if _, err = stmt.Exec(pkg.ID, pkg.DisplayName, pkg.Name.Value(), pkg.Version.Value(), now, now); err != nil {
 			return fmt.Errorf("ReplaceAll exec %q: %w", pkg.Name.Value(), err)
 		}
 	}
 
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("ReplaceAll commit: %w", err)
-	}
-	return nil
-}
-
-// Restore inserts entries with their original IDs (used by ImportReplace).
-// Uses INSERT OR IGNORE to skip conflicts silently.
-func (r *SQLitePackageRepository) Restore(entries []outbound.BackupEntry) error {
-	packages, err := packagesFromBackupEntries(entries)
-	if err != nil {
-		return err
-	}
-
-	stmt, err := r.conn.DB.Prepare(
-		`INSERT OR IGNORE INTO packages (id, display_name, package_name, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`)
-	if err != nil {
-		return fmt.Errorf("Restore prepare: %w", err)
-	}
-	defer stmt.Close()
-
-	now := time.Now().UTC()
-	for i, pkg := range packages {
-		if _, err := stmt.Exec(entries[i].ID, pkg.DisplayName, pkg.Name.Value(), pkg.Version.Value(), now, now); err != nil {
-			return fmt.Errorf("Restore exec %q: %w", pkg.Name.Value(), err)
-		}
 	}
 	return nil
 }
@@ -237,7 +209,8 @@ func (r *SQLitePackageRepository) scan(rows *sql.Rows) ([]*domain.Package, error
 		}
 		pkg, err := buildPackage(id, displayName, packageName, version, createdAt.String, updatedAt.String)
 		if err != nil {
-			return nil, err
+			log.Printf("ignorando pacote %d (%q) inválido no banco: %v", id, packageName, err)
+			continue
 		}
 		packages = append(packages, pkg)
 	}
@@ -263,14 +236,18 @@ func buildPackage(id int64, displayName, packageName, version, createdAt, update
 	if err != nil {
 		return nil, err
 	}
-	return &domain.Package{
+	pkg := &domain.Package{
 		ID:          id,
 		DisplayName: displayName,
 		Name:        name,
 		Version:     ver,
 		CreatedAt:   parseTime(createdAt),
 		UpdatedAt:   parseTime(updatedAt),
-	}, nil
+	}
+	if err := pkg.Validate(); err != nil {
+		return nil, err
+	}
+	return pkg, nil
 }
 
 func sortColumn(order domain.SortOrder) string {

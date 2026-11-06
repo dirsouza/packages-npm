@@ -9,7 +9,11 @@ description: 'Segurança — app desktop Go + Fyne (execução do npm, SQLite, b
 
 - O alvo do npm vem de `domain.Package.InstallTarget()` (`nome@versão`), montado só a partir de
   `PackageName`/`Version` já validados. Valor vindo da UI ou do CSV nunca chega ao npm sem
-  passar por `NewPackageName`/`NewVersion`; valor começando com `-` seria lido como flag do npm.
+  passar por `NewPackageName`/`NewVersion`. O nome segue as regras do npm (sem `-` inicial,
+  URL, caminho ou metacaractere): no Windows o `npm.cmd` roda pelo `cmd.exe`, que interpreta
+  `&`, `|` e `%` mesmo com `exec.Cmd`, então afrouxar essas validações abre injeção de comando.
+  Nome sem escopo terminado em `.tgz`, `.tar` ou `.tar.gz` (qualquer caixa) também é recusado:
+  o npm o trata como arquivo local do diretório corrente e executaria os scripts de instalação dele.
 - O npm é executado via `exec.Cmd` com `Path` absoluto e `Args` separados. Binários
   (npm, node, asdf) são escolhidos por caminho absoluto e limpo (`absolutePath`) e checados com
   `isExecutable`; a busca usa o `PATH` do processo e, depois, locais fixos de instalação e
@@ -44,9 +48,10 @@ description: 'Segurança — app desktop Go + Fyne (execução do npm, SQLite, b
 
 - `ci.yml` roda com `contents: read`; `release.yml` com `contents: write` (necessário para
   publicar a release) usando o `GITHUB_TOKEN`. Não ampliar `permissions`.
-- Actions de terceiros (`msys2/setup-msys2`, `softprops/action-gh-release`,
-  `golangci/golangci-lint-action`) estão fixadas por tag de major; action nova ou troca de
-  versão deve ser fixada por SHA de commit.
+- Actions (oficiais e de terceiros: `msys2/setup-msys2`, `softprops/action-gh-release`,
+  `golangci/golangci-lint-action`) são referenciadas pela tag de major (`@v2`, `@v7`), por
+  decisão do projeto — não peça fixação por SHA. Action nova deve ser de mantenedor
+  conhecido e justificada na PR.
 - Dependências Go ficam em `go.mod`/`go.sum` versionados; dependência nova exige
-  justificativa na PR. Ferramenta instalada no CI que gera artefato (`fyne`) não deve ganhar
-  novos usos com `@latest`.
+  justificativa na PR. Ferramentas que geram ou validam artefatos têm versão fixa (`fyne`
+  `v1.7.4` e `golangci-lint` `v2.15.0`); nunca `@latest` no CI nem nas instruções de build.

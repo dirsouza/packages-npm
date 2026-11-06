@@ -1,6 +1,8 @@
 package usecases
 
 import (
+	"errors"
+
 	"github.com/dirsouza/packages-npm/internal/core/domain"
 	"github.com/dirsouza/packages-npm/internal/core/ports/inbound"
 	"github.com/dirsouza/packages-npm/internal/core/ports/outbound"
@@ -64,10 +66,23 @@ func (s *PackageService) Delete(id int64) error {
 }
 
 func (s *PackageService) InstallSelected(ids []int64, onProgress outbound.ProgressFn) error {
+	return s.runOnSelected(ids, onProgress, (*domain.Package).InstallTarget, s.installer.Install)
+}
+
+// UninstallSelected uses the bare package name: npm uninstall does not accept a version.
+func (s *PackageService) UninstallSelected(ids []int64, onProgress outbound.ProgressFn) error {
+	return s.runOnSelected(ids, onProgress, packageNameOf, s.installer.Uninstall)
+}
+
+func (s *PackageService) runOnSelected(
+	ids []int64,
+	onProgress outbound.ProgressFn,
+	argOf func(*domain.Package) string,
+	op func(string) error,
+) error {
 	if len(ids) == 0 {
 		return domain.ErrNoPackageSelected
 	}
-
 	if onProgress == nil {
 		onProgress = func(string, int, int, error) {}
 	}
@@ -80,38 +95,14 @@ func (s *PackageService) InstallSelected(ids []int64, onProgress outbound.Progre
 		return domain.ErrPackageNotFound
 	}
 
-	total := len(packages)
 	for i, pkg := range packages {
-		target := pkg.InstallTarget()
-		installErr := s.installer.Install(target)
-		onProgress(target, i+1, total, installErr)
+		arg := argOf(pkg)
+		onProgress(arg, i+1, len(packages), op(arg))
 	}
-
 	return nil
 }
 
-// UninstallSelected remove globalmente os pacotes selecionados via npm.
-// Usa o nome do pacote sem versão (e.g. "typescript"), pois o npm uninstall
-// não aceita versão no argumento.
-func (s *PackageService) UninstallSelected(ids []int64, onProgress outbound.ProgressFn) error {
-	if len(ids) == 0 {
-		return domain.ErrNoPackageSelected
-	}
-
-	packages, err := s.repo.FindByIDs(ids)
-	if err != nil {
-		return err
-	}
-
-	total := len(packages)
-	for i, pkg := range packages {
-		pkgName := pkg.Name.Value()
-		uninstallErr := s.installer.Uninstall(pkgName)
-		onProgress(pkgName, i+1, total, uninstallErr)
-	}
-
-	return nil
-}
+func packageNameOf(pkg *domain.Package) string { return pkg.Name.Value() }
 
 // CheckInstalled cross-references all persisted packages against the globally
 // installed npm packages, returning installation info keyed by package name.
@@ -178,46 +169,64 @@ func (s *PackageService) ExportBackup(path string) error {
 //
 // Modos:
 //   - ImportReplace: apaga todos os registros e restaura com os IDs originais.
-//   - ImportMerge:   mantém os existentes e adiciona apenas os ausentes (por package_name).
-//
-// Retorna o número de pacotes efetivamente inseridos.
-func (s *PackageService) ImportBackup(path string, mode domain.ImportMode) (int, error) {
+//   - ImportMerge:   mantém os existentes e adiciona apenas os ausentes (por package_name);
+//     entradas já cadastradas ou inválidas são contadas em Skipped. Qualquer outra falha
+//     (ex.: banco indisponível) interrompe a importação e volta junto com o resultado parcial.
+func (s *PackageService) ImportBackup(path string, mode domain.ImportMode) (inbound.ImportResult, error) {
 	entries, err := s.backup.Read(path)
 	if err != nil {
-		return 0, err
+		return inbound.ImportResult{}, err
 	}
 
 	if mode == domain.ImportReplace {
-		err := s.repo.ReplaceAll(entries)
-		return len(entries), err
+		if err := s.repo.ReplaceAll(entries); err != nil {
+			return inbound.ImportResult{}, err
+		}
+		return inbound.ImportResult{Imported: len(entries)}, nil
 	}
 
-	// ImportMerge: adiciona apenas os ausentes (compara por package_name).
 	current, err := s.repo.FindAll(domain.SortByDisplayName)
 	if err != nil {
-		return 0, err
+		return inbound.ImportResult{}, err
 	}
 	existing := make(map[string]struct{}, len(current))
 	for _, p := range current {
 		existing[p.Name.Value()] = struct{}{}
 	}
 
-	imported := 0
+	var result inbound.ImportResult
 	for _, e := range entries {
 		if _, found := existing[e.PackageName]; found {
+			result.Skipped++
 			continue
 		}
-		dto := inbound.PackageDTO{
-			DisplayName: e.DisplayName,
-			PackageName: e.PackageName,
-			Version:     e.Version,
-		}
+		dto := inbound.PackageDTO{DisplayName: e.DisplayName, PackageName: e.PackageName, Version: e.Version}
 		if _, err := s.Add(dto); err != nil {
-			continue // ignora duplicatas/inválidos sem interromper
+			if !isRejectedEntry(err) {
+				return result, err
+			}
+			result.Skipped++
+			continue
 		}
-		imported++
+		existing[e.PackageName] = struct{}{}
+		result.Imported++
 	}
-	return imported, nil
+	return result, nil
+}
+
+func isRejectedEntry(err error) bool {
+	for _, rejected := range []error{
+		domain.ErrDuplicatePackage,
+		domain.ErrEmptyDisplayName,
+		domain.ErrEmptyPackageName,
+		domain.ErrInvalidPackageName,
+		domain.ErrInvalidVersion,
+	} {
+		if errors.Is(err, rejected) {
+			return true
+		}
+	}
+	return false
 }
 
 func packageFromDTO(dto inbound.PackageDTO) (*domain.Package, error) {

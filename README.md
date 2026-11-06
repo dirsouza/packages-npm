@@ -15,17 +15,18 @@ Permite instalar, desinstalar e gerenciar pacotes npm globais de forma centraliz
 | Funcionalidade | Descrição |
 | --- | --- |
 | 📦 Listagem | Exibe todos os pacotes cadastrados com status de instalação em tempo real |
-| ➕ Adicionar | Cadastra novo pacote com nome de exibição, nome npm e versão opcional |
+| ➕ Adicionar | Cadastra novo pacote com nome de exibição, nome npm (segue as regras de nome do npm, ex.: `typescript`, `@nestjs/cli`; não aceita arquivo local como `pacote.tgz`) e versão opcional |
 | ✏️ Editar | Atualiza os dados de um pacote existente |
 | 🗑️ Remover | Remove o registro do banco de dados (não desinstala o pacote) |
-| ⬇️ Instalar | Executa `npm install -g` nos pacotes selecionados com progress dialog |
-| 🚫 Desinstalar | Executa `npm uninstall -g` nos pacotes instalados selecionados |
-| ✅ Status | Detecta automaticamente se cada pacote está instalado, com versão incorreta ou ausente |
+| ⬇️ Instalar | Executa `npm install -g` nos pacotes selecionados com progress dialog; em caso de falha, mostra o motivo informado pelo npm |
+| 🚫 Desinstalar | Executa `npm uninstall -g` nos pacotes instalados selecionados; em caso de falha, mostra o motivo informado pelo npm |
+| 📋 Copiar erro | Toda mensagem de erro pode ser selecionada e tem o botão **Copiar** |
+| ✅ Status | Detecta automaticamente se cada pacote está instalado, com versão diferente da fixada ou ausente |
 | 🟢 Node.js | Exibe no rodapé as versões do Node.js e do npm usados pelo app |
 | ☑️ Seleção em massa | Selecionar todos / Desmarcar todos com um clique |
 | 🔀 Ordenação | Ordena a lista por ID (ordem de inserção, padrão) ou por Nome |
 | 💾 Backup | Exporta todos os pacotes para arquivo `.csv` |
-| 📥 Restaurar | Importa de `.csv` em modo Mesclar (preserva existentes) ou Substituir tudo |
+| 📥 Restaurar | Importa de `.csv` em modo Mesclar (preserva existentes e informa quantos foram ignorados) ou Substituir tudo |
 
 ---
 
@@ -51,9 +52,12 @@ Aberto pelo Finder ou pelo menu do sistema, o app não herda o `PATH` do termina
 | Windows | `PATH` do processo → instalador oficial (`Program Files\nodejs`) → Volta → nvm-windows → fnm → Scoop → Chocolatey |
 
 - **asdf:** usa a versão global do `~/.tool-versions` (ou `ASDF_NODEJS_VERSION`); se ela não estiver instalada, usa a maior versão instalada. Após instalar/desinstalar, o app roda `asdf reshim nodejs` para os comandos aparecerem no terminal.
-- **nvm:** usa o alias `default`; sem ele, a versão instalada mais recente.
+- **nvm:** usa o alias `default` quando ele aponta para uma versão exata; caso contrário, a maior versão instalada.
+- **fnm, nvm-windows:** a maior versão instalada.
+- Nos gerenciadores de versão, "maior versão" é comparada numericamente (`v24.1.0` > `v9.11.2`) e só conta instalação com npm executável.
+- Node instalado pelo Homebrew ou pelo sistema tem prioridade sobre os gerenciadores de versão: se você tem os dois, o app usa o do Homebrew mesmo que o terminal use o asdf/nvm. As versões em uso aparecem no rodapé do app.
 
-> Com o Corepack habilitado (`corepack enable`), os atalhos `yarn`/`pnpm` não pertencem ao npm, e `npm install -g yarn` falha com `EEXIST`. Para instalar o Yarn pelo app, rode antes `corepack disable yarn`.
+> Com o Corepack habilitado (`corepack enable`), os atalhos `yarn`/`pnpm` não pertencem ao npm, e `npm install -g yarn` falha com `EEXIST`. Nesse caso, a mensagem de erro do app já indica o comando a rodar — `corepack disable yarn` ou `corepack disable pnpm` — antes de instalar de novo.
 
 ---
 
@@ -77,7 +81,7 @@ Pré-requisitos: Go 1.26+ e Xcode Command Line Tools (veja tabela acima).
 ```bash
 git clone https://github.com/dirsouza/packages-npm.git
 cd packages-npm
-go install fyne.io/tools/cmd/fyne@latest
+go install fyne.io/tools/cmd/fyne@v1.7.4
 make package-macos
 ```
 
@@ -107,6 +111,9 @@ make run
 # 4. Ou compile o binário
 make build
 ./bin/packages-npm
+
+# 5. Rode os testes
+go test -race ./...
 ```
 
 ### Comandos disponíveis
@@ -160,7 +167,9 @@ id,display_name,package_name,version
 2. Selecione o arquivo `.csv`
 3. Escolha o modo:
    - **Substituir tudo** — apaga os registros atuais e restaura com os IDs originais
-   - **Mesclar** — mantém os existentes, adiciona apenas os ausentes
+   - **Mesclar** — mantém os existentes, adiciona apenas os ausentes e informa quantas linhas foram ignoradas (já cadastradas ou inválidas). Se a gravação falhar (ex.: banco indisponível), a importação para e informa quantos pacotes foram importados antes do erro
+
+O arquivo precisa ter o cabeçalho `id,display_name,package_name,version` na primeira linha (arquivos salvos pelo Excel com BOM são aceitos). Arquivo sem cabeçalho ou com colunas em outra ordem é recusado.
 
 ---
 
@@ -171,12 +180,14 @@ O campo "Versão" aceita os seguintes formatos:
 | Formato | Exemplo | Comportamento |
 | --- | --- | --- |
 | Vazio | *(vazio)* | Instala a versão `latest` |
-| Versão exata | `5.0.0`, `1.2.3-beta.1` | Instala exatamente essa versão |
+| Versão exata | `5.0.0`, `v5.0.0`, `1.2.3-beta.1` | Instala exatamente essa versão |
 | Range `^` | `^5.0.0` | Compatível com minor/patch |
 | Range `~` | `~1.2.0` | Compatível com patch |
 | Comparadores | `>=2.0.0`, `<3` | Instala versão que satisfaz |
 | Wildcard | `1.x`, `*` | Qualquer versão no major |
 | Dist-tag | `latest`, `next`, `beta` | Tag npm |
+
+Só a versão exata é comparada com a instalada (`v5.0.0` é tratada como `5.0.0`): com range, wildcard ou dist-tag, qualquer versão instalada aparece como "instalado".
 
 ---
 

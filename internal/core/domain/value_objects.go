@@ -5,10 +5,20 @@ import (
 	"strings"
 )
 
-var versionRegex = regexp.MustCompile(`^$|^\*$|^[~^><]=?\d[\w.*-]*$|^\d[\w.*-]*$|^[a-zA-Z][a-zA-Z0-9._-]*$`)
+const maxPackageNameLength = 214
 
-// PackageName represents a non-empty npm package identifier (trimmed).
-// Value Object: immutable, equality by value.
+var (
+	versionRegex      = regexp.MustCompile(`^$|^\*$|^[~^><]=?\d[\w.*-]*$|^\d[\w.*-]*$|^[a-zA-Z][a-zA-Z0-9._-]*$`)
+	exactVersionRegex = regexp.MustCompile(`^v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$`)
+	packageNameRegex  = regexp.MustCompile(`^(@[a-zA-Z0-9~][a-zA-Z0-9._~-]*/)?[a-zA-Z0-9~][a-zA-Z0-9._~-]*$`)
+	localArchiveRegex = regexp.MustCompile(`(?i)\.(tgz|tar\.gz|tar)$`)
+)
+
+// PackageName is an npm package identifier following npm naming rules
+// (URL-safe characters and an optional @scope/). It rejects flags, URLs,
+// paths and shell metacharacters, so it is safe as an npm argument. Unscoped
+// names ending in .tgz, .tar or .tar.gz are rejected too: npm installs them as
+// a local archive from the current directory, not from the registry.
 type PackageName struct {
 	value string
 }
@@ -18,7 +28,14 @@ func NewPackageName(raw string) (PackageName, error) {
 	if trimmed == "" {
 		return PackageName{}, ErrEmptyPackageName
 	}
+	if len(trimmed) > maxPackageNameLength || !packageNameRegex.MatchString(trimmed) || isLocalArchive(trimmed) {
+		return PackageName{}, ErrInvalidPackageName
+	}
 	return PackageName{value: trimmed}, nil
+}
+
+func isLocalArchive(name string) bool {
+	return !strings.HasPrefix(name, "@") && localArchiveRegex.MatchString(name)
 }
 
 func (p PackageName) Value() string             { return p.value }
@@ -49,5 +66,15 @@ func (v Version) String() string {
 	}
 	return v.value
 }
-func (v Version) IsDefined() bool       { return v.value != "" }
+func (v Version) IsDefined() bool { return v.value != "" }
+
+// ExactRelease returns the pinned release without the "v" prefix that npm also
+// accepts ("v5.0.0" → "5.0.0"), and false for ranges, wildcards and dist-tags.
+func (v Version) ExactRelease() (string, bool) {
+	match := exactVersionRegex.FindStringSubmatch(v.value)
+	if match == nil {
+		return "", false
+	}
+	return match[1], true
+}
 func (v Version) Equals(o Version) bool { return v.value == o.value }
