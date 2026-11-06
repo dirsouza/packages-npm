@@ -27,6 +27,14 @@ func TestNewPackageName(t *testing.T) {
 		{raw: "git+ssh://host/repo", wantErr: ErrInvalidPackageName},
 		{raw: "foo bar", wantErr: ErrInvalidPackageName},
 		{raw: "@scope", wantErr: ErrInvalidPackageName},
+		{raw: "payload.tgz", wantErr: ErrInvalidPackageName},
+		{raw: "PAYLOAD.TGZ", wantErr: ErrInvalidPackageName},
+		{raw: "payload.tar", wantErr: ErrInvalidPackageName},
+		{raw: "payload.tar.gz", wantErr: ErrInvalidPackageName},
+		{raw: "payload.TAR.GZ", wantErr: ErrInvalidPackageName},
+		{raw: "@scope/payload.tgz", want: "@scope/payload.tgz"},
+		{raw: "payload-tgz", want: "payload-tgz"},
+		{raw: "payload.tgz.js", want: "payload.tgz.js"},
 		{raw: strings.Repeat("a", maxPackageNameLength+1), wantErr: ErrInvalidPackageName},
 	}
 	for _, tt := range tests {

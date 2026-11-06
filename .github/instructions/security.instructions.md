@@ -12,6 +12,8 @@ description: 'Segurança — app desktop Go + Fyne (execução do npm, SQLite, b
   passar por `NewPackageName`/`NewVersion`. O nome segue as regras do npm (sem `-` inicial,
   URL, caminho ou metacaractere): no Windows o `npm.cmd` roda pelo `cmd.exe`, que interpreta
   `&`, `|` e `%` mesmo com `exec.Cmd`, então afrouxar essas validações abre injeção de comando.
+  Nome sem escopo terminado em `.tgz`, `.tar` ou `.tar.gz` (qualquer caixa) também é recusado:
+  o npm o trata como arquivo local do diretório corrente e executaria os scripts de instalação dele.
 - O npm é executado via `exec.Cmd` com `Path` absoluto e `Args` separados. Binários
   (npm, node, asdf) são escolhidos por caminho absoluto e limpo (`absolutePath`) e checados com
   `isExecutable`; a busca usa o `PATH` do processo e, depois, locais fixos de instalação e

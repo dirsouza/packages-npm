@@ -15,7 +15,7 @@ Permite instalar, desinstalar e gerenciar pacotes npm globais de forma centraliz
 | Funcionalidade | Descrição |
 | --- | --- |
 | 📦 Listagem | Exibe todos os pacotes cadastrados com status de instalação em tempo real |
-| ➕ Adicionar | Cadastra novo pacote com nome de exibição, nome npm (segue as regras de nome do npm, ex.: `typescript`, `@nestjs/cli`) e versão opcional |
+| ➕ Adicionar | Cadastra novo pacote com nome de exibição, nome npm (segue as regras de nome do npm, ex.: `typescript`, `@nestjs/cli`; não aceita arquivo local como `pacote.tgz`) e versão opcional |
 | ✏️ Editar | Atualiza os dados de um pacote existente |
 | 🗑️ Remover | Remove o registro do banco de dados (não desinstala o pacote) |
 | ⬇️ Instalar | Executa `npm install -g` nos pacotes selecionados com progress dialog; em caso de falha, mostra o motivo informado pelo npm |

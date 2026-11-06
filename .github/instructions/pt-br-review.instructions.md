@@ -34,7 +34,8 @@ description: 'Idioma, deduplicação e contexto de risco do review — packages-
   checar `isExecutable` antes de escolher um candidato, comparar versões numericamente
   (24.14 > 24.9) e comparar caminhos já normalizados (absolutos e limpos). O npm é executado
   via `exec.Cmd` com `Args`; nome e versão vindos da UI ou do CSV só chegam ao npm depois de
-  `NewPackageName`/`NewVersion`, que barram flags, URLs e metacaracteres do `cmd.exe` (Windows).
+  `NewPackageName`/`NewVersion`, que barram flags, URLs, arquivos locais (`.tgz`/`.tar`/`.tar.gz`
+  sem escopo) e metacaracteres do `cmd.exe` (Windows).
 - **Cross-platform**: o código roda em macOS, Linux e Windows. Aponte caminhos montados com
   `/` fixo em vez de `filepath`, `:` em vez de `os.PathListSeparator` e ausência do `npm.cmd`
   no Windows. Builds de Linux/Windows saem do CI (`release.yml`); o `.pkg` do macOS é gerado

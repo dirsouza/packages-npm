@@ -105,7 +105,7 @@ type Package struct {
 
 ### Value Objects
 
-- `PackageName`: imutável, criado por `NewPackageName(raw string)`. Faz trim e aceita só nomes válidos no npm — letras, dígitos, `-`, `.`, `_`, `~`, escopo `@x/` opcional, até 214 caracteres, sem começar com `-`. Isso barra flags, URLs, caminhos e metacaracteres de shell (o `npm.cmd` do Windows passa pelo `cmd.exe`)
+- `PackageName`: imutável, criado por `NewPackageName(raw string)`. Faz trim e aceita só nomes válidos no npm — letras, dígitos, `-`, `.`, `_`, `~`, escopo `@x/` opcional, até 214 caracteres, sem começar com `-`. Isso barra flags, URLs, caminhos e metacaracteres de shell (o `npm.cmd` do Windows passa pelo `cmd.exe`). Nome **sem escopo** terminado em `.tgz`, `.tar` ou `.tar.gz` (qualquer caixa) também é rejeitado: o npm o instalaria como arquivo local do diretório corrente, executando os scripts dele
 - `Version`: aceita versão exata (`5.0.0` ou `v5.0.0`, que o npm também trata como exata), ranges (`^5`, `~1.2`, `>=2`), wildcards (`1.x`, `*`) e dist-tags (`latest`, `beta`). Vazio = `latest`. `ExactRelease()` devolve a versão exata já normalizada (`v5.0.0` → `5.0.0`) — só ela é comparada com a instalada; ranges, wildcards e dist-tags nunca ficam "diferentes da instalada"
 - `Package.Validate()` rejeita nome de exibição vazio ou só com espaços
 
@@ -249,7 +249,7 @@ O app é aberto pelo Finder/menu do sistema e **não recebe o `PATH` do shell**.
 
 Resumo das regras; o detalhamento está em `.github/instructions/security.instructions.md`.
 
-- **npm:** nome e versão vindos da UI ou do CSV só chegam ao npm via `NewPackageName`/`NewVersion` → `InstallTarget()`. As regras de nome do npm e o regex de versão são a defesa contra flag injection e contra injeção de comando no Windows (`npm.cmd` é executado pelo `cmd.exe`, que interpreta `&`, `|`, `%`); não afrouxe essas validações. Execução sempre com `exec.Cmd` (`Path` absoluto + `Args`), nunca pelo diretório corrente
+- **npm:** nome e versão vindos da UI ou do CSV só chegam ao npm via `NewPackageName`/`NewVersion` → `InstallTarget()`. As regras de nome do npm e o regex de versão são a defesa contra flag injection, instalação de arquivo local (`payload.tgz`) e injeção de comando no Windows (`npm.cmd` é executado pelo `cmd.exe`, que interpreta `&`, `|`, `%`); não afrouxe essas validações. Execução sempre com `exec.Cmd` (`Path` absoluto + `Args`), nunca pelo diretório corrente
 - **Ambiente do usuário:** o npm herda `os.Environ()` e lê o `~/.npmrc` (podem conter tokens) — nunca exibir na UI nem logar esse conteúdo; nunca desligar a verificação TLS do registry (`--strict-ssl=false`, `NODE_TLS_REJECT_UNAUTHORIZED=0`)
 - **SQL:** valores sempre como parâmetro `?`; partes dinâmicas da query só via whitelist (`sortColumn`) ou lista de placeholders
 - **CSV importado** é entrada externa: validar cada linha antes de gravar e manter o `ReplaceAll` transacional
