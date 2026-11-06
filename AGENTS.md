@@ -222,7 +222,7 @@ O app é aberto pelo Finder/menu do sistema e **não recebe o `PATH` do shell**.
 - Conexão gerenciada em `infrastructure/database/Connection`; o composition root (`main.go`) controla o lifecycle com `defer conn.Close()`
 - Migrations via `ALTER TABLE ADD COLUMN` com tratamento de "duplicate column name" (idempotente)
 - Timestamps: `created_at` e `updated_at` preenchidos em `Save` e `Update`; `FindAll` ordena por `domain.SortOrder`
-- `FindAll`/`FindByIDs` ignoram (com log) registros que não passam mais na validação do domínio — um dado legado nunca pode impedir o app de abrir
+- `FindAll`/`FindByIDs` ignoram (com log) registros que não passam mais na validação do domínio — value objects **e** `Package.Validate()`, ambos aplicados em `buildPackage`; um dado legado nunca pode impedir o app de abrir nem aparecer inválido na lista
 
 ---
 

@@ -36,16 +36,27 @@ func names(t *testing.T, repo *SQLitePackageRepository) []string {
 	return out
 }
 
-func TestFindAllSkipsInvalidRows(t *testing.T) {
+func TestFindSkipsInvalidRows(t *testing.T) {
 	repo := newTestRepository(t)
 	if _, err := repo.conn.DB.Exec(
-		`INSERT INTO packages (display_name, package_name, version) VALUES ('Válido', 'typescript', ''), ('Legado', '-g', '')`,
+		`INSERT INTO packages (id, display_name, package_name, version) VALUES
+		 (1, 'Válido', 'typescript', ''),
+		 (2, 'Nome legado', '-g', ''),
+		 (3, '   ', 'yarn', ''),
+		 (4, 'Versão legada', 'ntl', '1 2')`,
 	); err != nil {
 		t.Fatal(err)
 	}
 
 	if got := names(t, repo); len(got) != 1 || got[0] != "typescript" {
-		t.Fatalf("got %v, want [typescript]", got)
+		t.Fatalf("FindAll: got %v, want [typescript]", got)
+	}
+	packages, err := repo.FindByIDs([]int64{1, 2, 3, 4})
+	if err != nil {
+		t.Fatalf("FindByIDs: %v", err)
+	}
+	if len(packages) != 1 || packages[0].Name.Value() != "typescript" {
+		t.Fatalf("FindByIDs: got %d pacotes, want só typescript", len(packages))
 	}
 }
 

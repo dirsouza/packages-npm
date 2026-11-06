@@ -236,14 +236,18 @@ func buildPackage(id int64, displayName, packageName, version, createdAt, update
 	if err != nil {
 		return nil, err
 	}
-	return &domain.Package{
+	pkg := &domain.Package{
 		ID:          id,
 		DisplayName: displayName,
 		Name:        name,
 		Version:     ver,
 		CreatedAt:   parseTime(createdAt),
 		UpdatedAt:   parseTime(updatedAt),
-	}, nil
+	}
+	if err := pkg.Validate(); err != nil {
+		return nil, err
+	}
+	return pkg, nil
 }
 
 func sortColumn(order domain.SortOrder) string {
