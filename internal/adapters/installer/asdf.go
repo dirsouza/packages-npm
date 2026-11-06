@@ -34,15 +34,18 @@ func resolveAsdfNpm(home string) (string, error) {
 		}
 	}
 
-	matches, err := filepath.Glob(filepath.Join(installs, "*", "bin", "npm"))
-	if err != nil || len(matches) == 0 {
-		return "", fmt.Errorf("nenhuma versão do nodejs instalada via asdf")
-	}
-	newest := matches[0]
-	for _, m := range matches[1:] {
-		if compareVersions(versionOf(m), versionOf(newest)) > 0 {
+	matches, _ := filepath.Glob(filepath.Join(installs, "*", "bin", "npm"))
+	newest := ""
+	for _, m := range matches {
+		if !isExecutable(m) {
+			continue
+		}
+		if newest == "" || compareVersions(versionOf(m), versionOf(newest)) > 0 {
 			newest = m
 		}
+	}
+	if newest == "" {
+		return "", fmt.Errorf("nenhuma versão do nodejs instalada via asdf")
 	}
 	return newest, nil
 }
