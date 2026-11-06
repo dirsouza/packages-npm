@@ -9,7 +9,7 @@ const maxPackageNameLength = 214
 
 var (
 	versionRegex      = regexp.MustCompile(`^$|^\*$|^[~^><]=?\d[\w.*-]*$|^\d[\w.*-]*$|^[a-zA-Z][a-zA-Z0-9._-]*$`)
-	exactVersionRegex = regexp.MustCompile(`^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$`)
+	exactVersionRegex = regexp.MustCompile(`^v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$`)
 	packageNameRegex  = regexp.MustCompile(`^(@[a-zA-Z0-9~][a-zA-Z0-9._~-]*/)?[a-zA-Z0-9~][a-zA-Z0-9._~-]*$`)
 )
 
@@ -61,7 +61,13 @@ func (v Version) String() string {
 }
 func (v Version) IsDefined() bool { return v.value != "" }
 
-// IsExact reports whether the version pins a single release instead of a
-// range, wildcard or dist-tag.
-func (v Version) IsExact() bool         { return exactVersionRegex.MatchString(v.value) }
+// ExactRelease returns the pinned release without the "v" prefix that npm also
+// accepts ("v5.0.0" → "5.0.0"), and false for ranges, wildcards and dist-tags.
+func (v Version) ExactRelease() (string, bool) {
+	match := exactVersionRegex.FindStringSubmatch(v.value)
+	if match == nil {
+		return "", false
+	}
+	return match[1], true
+}
 func (v Version) Equals(o Version) bool { return v.value == o.value }

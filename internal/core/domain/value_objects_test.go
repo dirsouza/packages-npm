@@ -54,24 +54,28 @@ func TestNewVersion(t *testing.T) {
 	}
 }
 
-func TestVersionIsExact(t *testing.T) {
-	tests := map[string]bool{
-		"5.0.0":        true,
-		"1.2.3-beta.1": true,
-		"":             false,
-		"^5.0.0":       false,
-		"~1.2":         false,
-		"1.x":          false,
-		"*":            false,
-		"latest":       false,
+func TestVersionExactRelease(t *testing.T) {
+	tests := map[string]string{
+		"5.0.0":         "5.0.0",
+		"v5.0.0":        "5.0.0",
+		"1.2.3-beta.1":  "1.2.3-beta.1",
+		"v1.2.3-beta.1": "1.2.3-beta.1",
+		"":              "",
+		"^5.0.0":        "",
+		"~1.2":          "",
+		"1.x":           "",
+		"*":             "",
+		"latest":        "",
+		"vnext":         "",
 	}
 	for raw, want := range tests {
 		v, err := NewVersion(raw)
 		if err != nil {
 			t.Fatalf("NewVersion(%q): %v", raw, err)
 		}
-		if got := v.IsExact(); got != want {
-			t.Errorf("Version(%q).IsExact() = %v, want %v", raw, got, want)
+		got, ok := v.ExactRelease()
+		if got != want || ok != (want != "") {
+			t.Errorf("Version(%q).ExactRelease() = (%q, %v), want (%q, %v)", raw, got, ok, want, want != "")
 		}
 	}
 }

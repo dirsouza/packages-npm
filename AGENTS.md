@@ -106,7 +106,7 @@ type Package struct {
 ### Value Objects
 
 - `PackageName`: imutável, criado por `NewPackageName(raw string)`. Faz trim e aceita só nomes válidos no npm — letras, dígitos, `-`, `.`, `_`, `~`, escopo `@x/` opcional, até 214 caracteres, sem começar com `-`. Isso barra flags, URLs, caminhos e metacaracteres de shell (o `npm.cmd` do Windows passa pelo `cmd.exe`)
-- `Version`: aceita versão exata (`5.0.0`), ranges (`^5`, `~1.2`, `>=2`), wildcards (`1.x`, `*`) e dist-tags (`latest`, `beta`). Vazio = `latest`. `IsExact()` diz se fixa uma única versão — só versão exata pode ficar "diferente da instalada"
+- `Version`: aceita versão exata (`5.0.0` ou `v5.0.0`, que o npm também trata como exata), ranges (`^5`, `~1.2`, `>=2`), wildcards (`1.x`, `*`) e dist-tags (`latest`, `beta`). Vazio = `latest`. `ExactRelease()` devolve a versão exata já normalizada (`v5.0.0` → `5.0.0`) — só ela é comparada com a instalada; ranges, wildcards e dist-tags nunca ficam "diferentes da instalada"
 - `Package.Validate()` rejeita nome de exibição vazio ou só com espaços
 
 ### Tipos de aplicação (`domain/types.go`)

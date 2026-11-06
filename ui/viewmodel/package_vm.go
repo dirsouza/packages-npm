@@ -26,7 +26,7 @@ type PackageVM struct {
 	DisplayName      string
 	PackageName      string
 	Version          string
-	ExactVersion     bool
+	ExactVersion     string
 	Selected         bool
 	InstallStatus    InstallStatus
 	InstalledVersion string
@@ -41,7 +41,7 @@ func FromDomain(p *domain.Package) PackageVM {
 		DisplayName:   p.DisplayName,
 		PackageName:   p.Name.Value(),
 		Version:       p.Version.Value(),
-		ExactVersion:  p.Version.IsExact(),
+		ExactVersion:  exactRelease(p.Version),
 		InstallStatus: StatusUnknown,
 		CreatedAt:     p.CreatedAt,
 		UpdatedAt:     p.UpdatedAt,
@@ -107,9 +107,14 @@ func (vm *PackageVM) ResolveInstallStatus(installedVersion string, isInstalled b
 		return
 	}
 	vm.InstalledVersion = installedVersion
-	if vm.ExactVersion && vm.Version != installedVersion {
+	if vm.ExactVersion != "" && vm.ExactVersion != installedVersion {
 		vm.InstallStatus = StatusMismatch
 		return
 	}
 	vm.InstallStatus = StatusInstalled
+}
+
+func exactRelease(v domain.Version) string {
+	release, _ := v.ExactRelease()
+	return release
 }

@@ -15,6 +15,8 @@ func TestResolveInstallStatus(t *testing.T) {
 		{version: "", installed: "5.9.3", isInstalled: true, want: StatusInstalled},
 		{version: "5.9.3", installed: "5.9.3", isInstalled: true, want: StatusInstalled},
 		{version: "5.0.0", installed: "5.9.3", isInstalled: true, want: StatusMismatch},
+		{version: "v5.0.0", installed: "5.0.0", isInstalled: true, want: StatusInstalled},
+		{version: "v5.0.0", installed: "5.9.3", isInstalled: true, want: StatusMismatch},
 		{version: "^5.0.0", installed: "5.9.3", isInstalled: true, want: StatusInstalled},
 		{version: "1.x", installed: "1.4.0", isInstalled: true, want: StatusInstalled},
 		{version: "latest", installed: "5.9.3", isInstalled: true, want: StatusInstalled},

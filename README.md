@@ -179,14 +179,14 @@ O campo "Versão" aceita os seguintes formatos:
 | Formato | Exemplo | Comportamento |
 | --- | --- | --- |
 | Vazio | *(vazio)* | Instala a versão `latest` |
-| Versão exata | `5.0.0`, `1.2.3-beta.1` | Instala exatamente essa versão |
+| Versão exata | `5.0.0`, `v5.0.0`, `1.2.3-beta.1` | Instala exatamente essa versão |
 | Range `^` | `^5.0.0` | Compatível com minor/patch |
 | Range `~` | `~1.2.0` | Compatível com patch |
 | Comparadores | `>=2.0.0`, `<3` | Instala versão que satisfaz |
 | Wildcard | `1.x`, `*` | Qualquer versão no major |
 | Dist-tag | `latest`, `next`, `beta` | Tag npm |
 
-Só a versão exata é comparada com a instalada: com range, wildcard ou dist-tag, qualquer versão instalada aparece como "instalado".
+Só a versão exata é comparada com a instalada (`v5.0.0` é tratada como `5.0.0`): com range, wildcard ou dist-tag, qualquer versão instalada aparece como "instalado".
 
 ---
 
