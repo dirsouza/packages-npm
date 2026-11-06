@@ -10,12 +10,17 @@ import (
 	"strings"
 )
 
-// asdfDataDir returns the asdf data directory ($ASDF_DATA_DIR or ~/.asdf).
+// asdfDataDir returns the asdf data directory ($ASDF_DATA_DIR or ~/.asdf) as
+// a clean absolute path, so it can be compared with resolved npm paths.
 func asdfDataDir(home string) string {
-	if dir := os.Getenv("ASDF_DATA_DIR"); dir != "" {
-		return dir
+	dir := os.Getenv("ASDF_DATA_DIR")
+	if dir == "" {
+		dir = filepath.Join(home, ".asdf")
 	}
-	return filepath.Join(home, ".asdf")
+	if abs, err := absolutePath(dir); err == nil {
+		return abs
+	}
+	return filepath.Clean(dir)
 }
 
 // resolveAsdfNpm locates npm inside an asdf nodejs installation.
